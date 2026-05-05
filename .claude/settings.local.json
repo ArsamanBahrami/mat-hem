@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(sudo rm:*)",
+      "Bash(npm cache:*)",
+      "Bash(bun --version)"
+    ]
+  }
+}
