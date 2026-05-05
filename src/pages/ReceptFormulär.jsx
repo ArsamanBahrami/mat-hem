@@ -105,40 +105,49 @@ export default function ReceptFormulär() {
     setError(null)
     setSaving(true)
 
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { setError('Inte inloggad'); setSaving(false); return }
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setError('Inte inloggad'); return }
 
-    const imageUrl = await uploadImage(session.user.id)
+      const imageUrl = await uploadImage(session.user.id)
 
-    const cleanIngredients = ingredients
-      .filter(i => i.name.trim())
-      .map(i => ({
-        name:     i.name.trim(),
-        quantity: i.quantity ? Number(i.quantity) : null,
-        unit:     i.unit.trim() || null,
-      }))
+      const cleanIngredients = ingredients
+        .filter(i => i.name.trim())
+        .map(i => ({
+          name:     i.name.trim(),
+          quantity: i.quantity ? Number(i.quantity) : null,
+          unit:     i.unit.trim() || null,
+        }))
 
-    const cleanSteps = steps
-      .filter(s => s.text.trim())
-      .map((s, idx) => ({ step: idx + 1, text: s.text.trim() }))
+      const cleanSteps = steps
+        .filter(s => s.text.trim())
+        .map((s, idx) => ({ step: idx + 1, text: s.text.trim() }))
 
-    const { data, error } = await supabase.rpc('upsert_recipe', {
-      p_user_id:      session.user.id,
-      p_title:        title.trim(),
-      p_description:  description.trim() || null,
-      p_image_url:    imageUrl,
-      p_source_url:   sourceUrl.trim() || null,
-      p_ingredients:  cleanIngredients,
-      p_instructions: cleanSteps,
-      p_servings:     Number(servings) || 4,
-      p_prep_time:    prepTime ? Number(prepTime) : null,
-      p_cook_time:    cookTime ? Number(cookTime) : null,
-      p_tags:         tags,
-      p_id:           isEdit ? id : null,
-    })
+      const { data, error } = await supabase.rpc('upsert_recipe', {
+        p_user_id:      session.user.id,
+        p_title:        title.trim(),
+        p_description:  description.trim() || null,
+        p_image_url:    imageUrl,
+        p_source_url:   sourceUrl.trim() || null,
+        p_ingredients:  cleanIngredients,
+        p_instructions: cleanSteps,
+        p_servings:     Number(servings) || 4,
+        p_prep_time:    prepTime ? Number(prepTime) : null,
+        p_cook_time:    cookTime ? Number(cookTime) : null,
+        p_tags:         tags,
+        p_id:           isEdit ? id : null,
+      })
 
-    if (error) { setError(error.message); setSaving(false); return }
-    navigate(`/recept/${data.id}`)
+      if (error) { setError(error.message); return }
+      if (!data)  { setError('Receptet kunde inte sparas — försök igen.'); return }
+
+      navigate(`/recept/${data.id}`)
+    } catch (err) {
+      console.error('handleSubmit fel:', err)
+      setError(err.message ?? 'Något gick fel — försök igen.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
