@@ -36,12 +36,14 @@ export default function App() {
       return
     }
 
+    setLoading(true)
     supabase
       .from('profiles')
       .select('*, households(name)')
       .eq('id', session.user.id)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) console.error('Profil-fetch fel:', error.message)
         setProfile(data)
         setLoading(false)
       })

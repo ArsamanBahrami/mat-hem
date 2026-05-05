@@ -51,4 +51,4 @@ CREATE POLICY "households: member can read"
 -- Households: användare kan skapa ett hushåll (vid onboarding)
 CREATE POLICY "households: authenticated can insert"
   ON public.households FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated');
+  WITH CHECK (auth.uid() IS NOT NULL);

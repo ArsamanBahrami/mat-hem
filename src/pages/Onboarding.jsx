@@ -13,27 +13,16 @@ export default function Onboarding({ onComplete, userId }) {
     setLoading(true)
 
     try {
-      // Create household
-      const { data: household, error: hError } = await supabase
-        .from('households')
-        .insert({ name: householdName.trim() })
-        .select()
-        .single()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Ingen aktiv session — försök logga in igen.')
 
-      if (hError) throw hError
+      const { data: profile, error } = await supabase.rpc('setup_onboarding', {
+        p_user_id:      session.user.id,
+        p_household:    householdName.trim(),
+        p_display_name: displayName.trim(),
+      })
 
-      // Create profile
-      const { data: profile, error: pError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          household_id: household.id,
-          display_name: displayName.trim(),
-        })
-        .select('*, households(name)')
-        .single()
-
-      if (pError) throw pError
+      if (error) throw error
 
       onComplete(profile)
     } catch (err) {
