@@ -6,6 +6,8 @@ import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
 import Home from './pages/Home'
 import Recept from './pages/Recept'
+import ReceptDetalj from './pages/ReceptDetalj'
+import ReceptFormulär from './pages/ReceptFormulär'
 import Meny from './pages/Meny'
 import Inkop from './pages/Inkop'
 import OfflineBanner from './components/OfflineBanner'
@@ -70,9 +72,12 @@ export default function App() {
         </Routes>
       ) : (
         <Routes>
-          <Route element={<Layout />}>
+          <Route element={<Layout profile={profile} />}>
             <Route path="/" element={<Home profile={profile} />} />
             <Route path="/recept" element={<Recept />} />
+            <Route path="/recept/ny" element={<ReceptFormulär />} />
+            <Route path="/recept/:id" element={<ReceptDetalj />} />
+            <Route path="/recept/:id/redigera" element={<ReceptFormulär />} />
             <Route path="/meny" element={<Meny />} />
             <Route path="/inkop" element={<Inkop />} />
             <Route path="*" element={<Navigate to="/" replace />} />
