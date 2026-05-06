@@ -2,9 +2,9 @@ const SYSTEM_PROMPT =
   'Du är en familjekokerska som planerar veckomenyer. Du får en lista med recept och ska välja ut en varierad meny. ' +
   'Regler: 1) Variera proteinkällan — inte samma tagg två dagar i rad. 2) Blanda svårighetsgrader. ' +
   '3) Undvik recept som använts de senaste 2 veckorna. 4) Matcha budget-parametern. ' +
-  '5) Om kock är angiven, ta hänsyn till svårighetsgrad. ' +
-  'Svara ENDAST med giltig JSON: {"måndag": "recipe_uuid_eller_null", "tisdag": ..., osv}. ' +
-  'Inkludera bara de dagar som efterfrågats. Använd null (inte strängen "null") för dagar utan lämpligt recept.'
+  '5) Följ kockfördelningen exakt om den anges. ' +
+  'Svara ENDAST med giltig JSON: {"måndag": {"recipe_id": "uuid_eller_null", "cook": "Arsi"}, "tisdag": ..., osv}. ' +
+  'Inkludera bara de dagar som efterfrågats. Använd null (inte strängen "null") för recipe_id om inget lämpligt recept finns.'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +33,7 @@ export const handler = async (event) => {
   }
 
   const { recipes = [], recent_recipe_ids = [], parameters = {} } = body
-  const { days = [], budget = 'vardag', cook = 'båda', avoid = '' } = parameters
+  const { days = [], budget = 'vardag', cook = 'båda', avoid = '', nikkiDays = 1 } = parameters
 
   if (!days.length) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Minst en dag krävs' }) }
@@ -51,7 +51,9 @@ export const handler = async (event) => {
     `Parametrar:`,
     `- Dagar att planera: ${days.join(', ')}`,
     `- Budget/stil: ${budget}`,
-    `- Vem lagar: ${cook}`,
+    cook === 'Nikki'
+      ? `- Kockfördelning: Nikki lagar ${nikkiDays} ${nikkiDays === 1 ? 'dag' : 'dagar'} — dessa dagar MÅSTE ha taggen 'enkel'. Arsi lagar resten och klarar alla svårighetsgrader. Tilldela "cook": "Nikki" för Nikkis dagar och "cook": "Arsi" för Arsis dagar.`
+      : `- Vem lagar: ${cook === 'Arsi' ? 'Arsi lagar alla dagar. Tilldela "cook": "Arsi" för alla dagar.' : 'Arsi och Nikki lagar tillsammans — fördelning valfri.'}`,
     avoid ? `- Undvik: ${avoid}` : null,
   ].filter(Boolean).join('\n')
 
@@ -90,10 +92,16 @@ export const handler = async (event) => {
     return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'Kunde inte tolka AI-svaret som JSON' }) }
   }
 
-  // Normalize: replace string "null" or empty strings with actual null
+  // Normalize to {recipe_id, cook} format, handling both old (string) and new (object) AI responses
   const normalized = {}
-  for (const [day, id] of Object.entries(parsed)) {
-    normalized[day] = (id === null || id === 'null' || id === '') ? null : id
+  for (const [day, val] of Object.entries(parsed)) {
+    if (val === null || typeof val === 'string') {
+      const id = (val === null || val === 'null' || val === '') ? null : val
+      normalized[day] = { recipe_id: id, cook: cook === 'Arsi' ? 'Arsi' : null }
+    } else {
+      const id = (val.recipe_id === null || val.recipe_id === 'null' || val.recipe_id === '') ? null : val.recipe_id
+      normalized[day] = { recipe_id: id, cook: val.cook ?? null }
+    }
   }
 
   return {

@@ -142,6 +142,7 @@ export default function MenyNy() {
   const [selectedDays, setSelectedDays] = useState(['måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag'])
   const [budget, setBudget]           = useState('vardag')
   const [cook, setCook]               = useState('båda')
+  const [nikkiDays, setNikkiDays]     = useState(1)
   const [avoid, setAvoid]             = useState('')
 
   // Data
@@ -198,7 +199,7 @@ export default function MenyNy() {
             prep_time_min: r.prep_time_min, cook_time_min: r.cook_time_min,
           })),
           recent_recipe_ids: recentIds,
-          parameters: { days: selectedDays, budget, cook, avoid },
+          parameters: { days: selectedDays, budget, cook, avoid, nikkiDays },
         }),
       })
       const json = await res.json()
@@ -216,8 +217,9 @@ export default function MenyNy() {
   function openSwap(day) {
     const usedIds = new Set(
       Object.entries(generatedMenu)
-        .filter(([d, id]) => d !== day && id)
-        .map(([, id]) => id)
+        .filter(([d]) => d !== day)
+        .map(([, v]) => v?.recipe_id)
+        .filter(Boolean)
     )
     const pool = recipes.filter(r => !usedIds.has(r.id))
     setSwapOptions(shuffle(pool).slice(0, 3))
@@ -225,7 +227,10 @@ export default function MenyNy() {
   }
 
   function applySwap(newRecipeId) {
-    setGeneratedMenu(prev => ({ ...prev, [swapDay]: newRecipeId }))
+    setGeneratedMenu(prev => ({
+      ...prev,
+      [swapDay]: { ...prev[swapDay], recipe_id: newRecipeId },
+    }))
     setSwapDay(null)
   }
 
@@ -237,7 +242,7 @@ export default function MenyNy() {
         p_user_id:         session.user.id,
         p_week_start_date: getThisMonday(),
         p_days:            generatedMenu,
-        p_parameters:      { days: selectedDays, budget, cook, avoid },
+        p_parameters:      { days: selectedDays, budget, cook, avoid, nikkiDays },
       })
       if (error) { setGenError(error.message); return }
       navigate('/meny')
@@ -267,13 +272,26 @@ export default function MenyNy() {
 
         <div className="px-4 pt-4 flex flex-col gap-3">
           {daysInMenu.map(day => {
-            const recipeId = generatedMenu[day]
+            const dayData  = generatedMenu[day]
+            const recipeId = dayData?.recipe_id ?? null
+            const dayCook  = dayData?.cook ?? null
             const recipe   = recipeId ? recipeMap.get(recipeId) : null
             return (
               <div key={day} className="bg-white rounded-2xl shadow-sm p-4">
-                <p className="text-xs font-bold text-forest-600 uppercase tracking-wide mb-2">
-                  {day.charAt(0).toUpperCase() + day.slice(1)}
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold text-forest-600 uppercase tracking-wide">
+                    {day.charAt(0).toUpperCase() + day.slice(1)}
+                  </p>
+                  {dayCook && (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      dayCook === 'Nikki'
+                        ? 'bg-purple-50 text-purple-600 border border-purple-200'
+                        : dayCook === 'Arsi'
+                        ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                        : 'bg-gray-50 text-gray-500 border border-gray-200'
+                    }`}>{dayCook}</span>
+                  )}
+                </div>
                 {recipe ? (
                   <MiniCard recipe={recipe} onSwap={() => openSwap(day)} />
                 ) : (
@@ -413,6 +431,25 @@ export default function MenyNy() {
                   </button>
                 ))}
               </div>
+
+              {cook === 'Nikki' && (
+                <div className="flex items-center justify-between bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 mt-1">
+                  <span className="text-sm text-purple-800 font-medium">Hur många dagar lagar Nikki?</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setNikkiDays(n => Math.max(1, n - 1))}
+                      className="w-7 h-7 flex items-center justify-center bg-white border border-purple-200 rounded-full text-purple-600 font-bold text-lg leading-none"
+                    >−</button>
+                    <span className="text-sm font-bold text-purple-800 w-4 text-center">{nikkiDays}</span>
+                    <button
+                      type="button"
+                      onClick={() => setNikkiDays(n => Math.min(selectedDays.length, n + 1))}
+                      className="w-7 h-7 flex items-center justify-center bg-white border border-purple-200 rounded-full text-purple-600 font-bold text-lg leading-none"
+                    >+</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -431,7 +468,11 @@ export default function MenyNy() {
             <div className="bg-sand-50 rounded-xl p-3 flex flex-col gap-1.5 text-xs text-gray-500">
               <p><span className="font-semibold">Dagar:</span> {selectedDays.join(', ')}</p>
               <p><span className="font-semibold">Budget:</span> {budget}</p>
-              <p><span className="font-semibold">Lagar:</span> {cook}</p>
+              <p><span className="font-semibold">Lagar:</span> {
+                cook === 'Nikki'
+                  ? `Nikki ${nikkiDays} ${nikkiDays === 1 ? 'dag' : 'dagar'}, Arsi resten`
+                  : cook
+              }</p>
             </div>
           </div>
         )}

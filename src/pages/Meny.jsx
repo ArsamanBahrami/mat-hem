@@ -21,12 +21,27 @@ function formatDateRange(weekStartDate) {
   return `${fmt(start)} – ${fmt(end)}`
 }
 
-function RecipeCard({ recipe, day }) {
+// Stödjer både gammalt format {dag: "uuid"} och nytt {dag: {recipe_id, cook}}
+function getDayRecipeId(val) {
+  if (!val) return null
+  return typeof val === 'string' ? val : (val.recipe_id ?? null)
+}
+function getDayCook(val) {
+  if (!val || typeof val === 'string') return null
+  return val.cook ?? null
+}
+
+function RecipeCard({ recipe, day, cook }) {
   const totalMin = (recipe.prep_time_min ?? 0) + (recipe.cook_time_min ?? 0)
   return (
     <div className="flex gap-3 items-center py-3 border-b border-gray-50 last:border-0">
       <div className="flex-shrink-0 w-12 text-center">
         <span className="text-xs font-semibold text-gray-400 uppercase">{day.slice(0, 3)}</span>
+        {cook && (
+          <span className={`block text-xs font-semibold mt-0.5 ${
+            cook === 'Nikki' ? 'text-purple-500' : 'text-blue-500'
+          }`}>{cook}</span>
+        )}
       </div>
       {recipe.image_url ? (
         <img src={recipe.image_url} alt={recipe.title} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
@@ -123,10 +138,11 @@ export default function Meny() {
             </div>
 
             {DAYS_ORDER.filter(day => day in (menu.days ?? {})).map(day => {
-              const recipeId = menu.days[day]
+              const recipeId = getDayRecipeId(menu.days[day])
+              const cook     = getDayCook(menu.days[day])
               const recipe   = recipeId ? recipeMap[recipeId] : null
               return recipe ? (
-                <RecipeCard key={day} recipe={recipe} day={day} />
+                <RecipeCard key={day} recipe={recipe} day={day} cook={cook} />
               ) : (
                 <div key={day} className="flex gap-3 items-center py-3 border-b border-gray-50 last:border-0">
                   <div className="flex-shrink-0 w-12 text-center">
