@@ -27,8 +27,11 @@ export default function ReceptFormulär() {
   const [existingImg, setExistingImg] = useState(null)
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState(null)
-  const [parsing,     setParsing]     = useState(false)
-  const [aiImported,  setAiImported]  = useState(false)
+  const [parsing,      setParsing]     = useState(false)
+  const [aiImported,   setAiImported]  = useState(false)
+  const [urlImport,    setUrlImport]   = useState(false)
+  const [importUrl,    setImportUrl]   = useState('')
+  const [fetchingUrl,  setFetchingUrl] = useState(false)
   const fileRef   = useRef()
   const aiFileRef = useRef()
 
@@ -158,6 +161,58 @@ export default function ReceptFormulär() {
       console.error('AI-import fel:', err)
     } finally {
       setParsing(false)
+    }
+  }
+
+  // ── URL-import ───────────────────────────────────────
+  async function handleUrlImport() {
+    if (!importUrl.trim()) return
+    setError(null)
+    setFetchingUrl(true)
+    setAiImported(false)
+
+    try {
+      const res  = await fetch('/.netlify/functions/parse-recipe-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: importUrl.trim() }),
+      })
+      const json = await res.json()
+
+      if (json.error) {
+        setError(json.error)
+        return
+      }
+
+      if (json.title)         setTitle(json.title)
+      if (json.description)   setDescription(json.description)
+      if (json.servings)      setServings(json.servings)
+      if (json.prep_time_min) setPrepTime(json.prep_time_min)
+      if (json.cook_time_min) setCookTime(json.cook_time_min)
+      if (json.ingredients?.length) {
+        setIngredients(json.ingredients.map(i => ({
+          name:     i.name     ?? '',
+          quantity: i.quantity ?? '',
+          unit:     i.unit     ?? '',
+        })))
+      }
+      if (json.instructions?.length) {
+        setSteps(json.instructions.map((s, idx) => ({
+          step: s.step ?? idx + 1,
+          text: s.text ?? '',
+        })))
+      }
+      if (json.suggested_tags?.length) {
+        setTags(json.suggested_tags.filter(t => t))
+      }
+      setSourceUrl(importUrl.trim())
+      setAiImported(true)
+      setUrlImport(false)
+    } catch (err) {
+      setError('Något gick fel vid hämtning av länken — försök igen.')
+      console.error('URL-import fel:', err)
+    } finally {
+      setFetchingUrl(false)
     }
   }
 
@@ -305,6 +360,53 @@ export default function ReceptFormulär() {
             className="hidden"
             onChange={handleAiFileChange}
           />
+
+          <button
+            type="button"
+            disabled={parsing || fetchingUrl}
+            onClick={() => { setUrlImport(v => !v); setError(null) }}
+            className={`flex items-center gap-2 text-sm rounded-xl px-4 py-2.5 transition font-medium ${
+              parsing || fetchingUrl
+                ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                : 'text-forest-700 bg-forest-50 border border-forest-200 active:bg-forest-100'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path d="M12.232 4.232a2.5 2.5 0 013.536 3.536l-1.225 1.224a.75.75 0 001.061 1.06l1.224-1.224a4 4 0 00-5.656-5.656l-3 3a4 4 0 00.225 5.865.75.75 0 00.977-1.138 2.5 2.5 0 01-.142-3.667l3-3z" />
+              <path d="M11.603 7.963a.75.75 0 00-.977 1.138 2.5 2.5 0 01.142 3.667l-3 3a2.5 2.5 0 01-3.536-3.536l1.225-1.224a.75.75 0 00-1.061-1.06l-1.224 1.224a4 4 0 105.656 5.656l3-3a4 4 0 00-.225-5.865z" />
+            </svg>
+            Importera från länk
+          </button>
+
+          {urlImport && (
+            <div className="flex gap-2 mt-1">
+              <input
+                type="url"
+                value={importUrl}
+                onChange={e => setImportUrl(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleUrlImport())}
+                placeholder="https://…"
+                className={inputCls + ' flex-1'}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleUrlImport}
+                disabled={fetchingUrl || !importUrl.trim()}
+                className="flex items-center gap-2 px-4 py-2.5 bg-forest-600 text-white text-sm font-medium rounded-xl disabled:opacity-50 shrink-0"
+              >
+                {fetchingUrl ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                    Hämtar…
+                  </>
+                ) : 'Hämta recept'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Grundinfo */}
