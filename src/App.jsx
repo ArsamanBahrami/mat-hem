@@ -9,6 +9,8 @@ import Recept from './pages/Recept'
 import ReceptDetalj from './pages/ReceptDetalj'
 import ReceptFormulär from './pages/ReceptFormulär'
 import Meny from './pages/Meny'
+import MenyNy from './pages/MenyNy'
+import MenyHistorik from './pages/MenyHistorik'
 import Inkop from './pages/Inkop'
 import OfflineBanner from './components/OfflineBanner'
 
@@ -79,6 +81,8 @@ export default function App() {
             <Route path="/recept/:id" element={<ReceptDetalj />} />
             <Route path="/recept/:id/redigera" element={<ReceptFormulär />} />
             <Route path="/meny" element={<Meny />} />
+            <Route path="/meny/ny" element={<MenyNy />} />
+            <Route path="/meny/historik" element={<MenyHistorik />} />
             <Route path="/inkop" element={<Inkop />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
