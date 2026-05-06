@@ -83,13 +83,39 @@ export const handler = async (event) => {
   }
 
   const aiData = await aiResponse.json()
-  const text = aiData.content?.[0]?.text ?? ''
+  const rawText = aiData.content?.[0]?.text ?? ''
+
+  console.log('[generate-menu] raw AI text:', rawText)
+
+  // Strip BOM, markdown code fences, and leading/trailing whitespace
+  let cleaned = rawText
+    .replace(/^\uFEFF/, '')                    // BOM
+    .replace(/^```(?:json)?\s*/i, '')          // opening ```json or ```
+    .replace(/\s*```\s*$/, '')                 // closing ```
+    .trim()
+
+  // If Claude wrapped the JSON in extra prose, extract the first {...} block
+  const braceStart = cleaned.indexOf('{')
+  const braceEnd   = cleaned.lastIndexOf('}')
+  if (braceStart !== -1 && braceEnd !== -1 && braceEnd > braceStart) {
+    cleaned = cleaned.slice(braceStart, braceEnd + 1)
+  }
+
+  console.log('[generate-menu] cleaned text:', cleaned)
 
   let parsed
   try {
-    parsed = JSON.parse(text)
-  } catch {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'Kunde inte tolka AI-svaret som JSON' }) }
+    parsed = JSON.parse(cleaned)
+  } catch (parseErr) {
+    console.error('[generate-menu] JSON parse error:', parseErr.message)
+    return {
+      statusCode: 502,
+      headers: CORS,
+      body: JSON.stringify({
+        error: 'Kunde inte tolka AI-svaret som JSON',
+        raw: rawText,
+      }),
+    }
   }
 
   // Normalize to {recipe_id, cook} format, handling both old (string) and new (object) AI responses
