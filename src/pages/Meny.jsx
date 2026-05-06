@@ -31,10 +31,10 @@ function getDayCook(val) {
   return val.cook ?? null
 }
 
-function RecipeCard({ recipe, day, cook }) {
+function RecipeCard({ recipe, day, cook, onClick }) {
   const totalMin = (recipe.prep_time_min ?? 0) + (recipe.cook_time_min ?? 0)
   return (
-    <div className="flex gap-3 items-center py-3 border-b border-gray-50 last:border-0">
+    <button onClick={onClick} className="flex gap-3 items-center py-3 border-b border-gray-50 last:border-0 w-full text-left active:bg-sand-50 transition rounded-xl -mx-1 px-1">
       <div className="flex-shrink-0 w-12 text-center">
         <span className="text-xs font-semibold text-gray-400 uppercase">{day.slice(0, 3)}</span>
         {cook && (
@@ -63,7 +63,7 @@ function RecipeCard({ recipe, day, cook }) {
           )}
         </div>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -142,7 +142,7 @@ export default function Meny() {
               const cook     = getDayCook(menu.days[day])
               const recipe   = recipeId ? recipeMap[recipeId] : null
               return recipe ? (
-                <RecipeCard key={day} recipe={recipe} day={day} cook={cook} />
+                <RecipeCard key={day} recipe={recipe} day={day} cook={cook} onClick={() => navigate(`/recept/${recipe.id}`)} />
               ) : (
                 <div key={day} className="flex gap-3 items-center py-3 border-b border-gray-50 last:border-0">
                   <div className="flex-shrink-0 w-12 text-center">
