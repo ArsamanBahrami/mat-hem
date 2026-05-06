@@ -27,7 +27,10 @@ export default function ReceptFormulär() {
   const [existingImg, setExistingImg] = useState(null)
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState(null)
-  const fileRef = useRef()
+  const [parsing,     setParsing]     = useState(false)
+  const [aiImported,  setAiImported]  = useState(false)
+  const fileRef   = useRef()
+  const aiFileRef = useRef()
 
   useEffect(() => {
     if (!isEdit) return
@@ -96,6 +99,75 @@ export default function ReceptFormulär() {
       .upload(path, imageFile, { upsert: true })
     if (error) { console.warn('Bilduppladdning misslyckades:', error.message); return existingImg ?? null }
     return supabase.storage.from('recipe-images').getPublicUrl(data.path).data.publicUrl
+  }
+
+  // ── AI-import ────────────────────────────────────────
+  async function handleAiFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    // Reset so the same file can be selected again if needed
+    e.target.value = ''
+
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+    setError(null)
+    setParsing(true)
+    setAiImported(false)
+
+    try {
+      const imageBase64 = await fileToBase64(file)
+      const mediaType   = file.type || 'image/jpeg'
+
+      const res = await fetch('/.netlify/functions/parse-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64, mediaType }),
+      })
+
+      const json = await res.json()
+
+      if (json.error) {
+        setError('Kunde inte hitta ett recept i bilden. Försök med en tydligare bild eller lägg in manuellt.')
+        return
+      }
+
+      if (json.title)         setTitle(json.title)
+      if (json.description)   setDescription(json.description)
+      if (json.servings)      setServings(json.servings)
+      if (json.prep_time_min) setPrepTime(json.prep_time_min)
+      if (json.cook_time_min) setCookTime(json.cook_time_min)
+      if (json.ingredients?.length) {
+        setIngredients(json.ingredients.map(i => ({
+          name:     i.name     ?? '',
+          quantity: i.quantity ?? '',
+          unit:     i.unit     ?? '',
+        })))
+      }
+      if (json.instructions?.length) {
+        setSteps(json.instructions.map((s, idx) => ({
+          step: s.step ?? idx + 1,
+          text: s.text ?? '',
+        })))
+      }
+      if (json.suggested_tags?.length) {
+        setTags(json.suggested_tags.filter(t => t))
+      }
+      setAiImported(true)
+    } catch (err) {
+      setError('Något gick fel vid AI-tolkning — försök igen.')
+      console.error('AI-import fel:', err)
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload  = () => resolve(reader.result.split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
   }
 
   // ── Submit ────────────────────────────────────────────
@@ -200,14 +272,39 @@ export default function ReceptFormulär() {
           />
           <button
             type="button"
-            disabled
-            className="flex items-center gap-2 text-sm text-gray-400 bg-gray-100 rounded-xl px-4 py-2.5 cursor-not-allowed"
+            disabled={parsing}
+            onClick={() => aiFileRef.current?.click()}
+            className={`flex items-center gap-2 text-sm rounded-xl px-4 py-2.5 transition font-medium ${
+              parsing
+                ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                : 'text-forest-700 bg-forest-50 border border-forest-200 active:bg-forest-100'
+            }`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-              <path fillRule="evenodd" d="M1 8a7 7 0 1114 0A7 7 0 011 8zm7-4a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 4z" clipRule="evenodd" />
-            </svg>
-            Importera från bild — kommer snart
+            {parsing ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                Analyserar bild…
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                  <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+                  <path fillRule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                </svg>
+                Importera från bild
+              </>
+            )}
           </button>
+          <input
+            ref={aiFileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAiFileChange}
+          />
         </div>
 
         {/* Grundinfo */}
@@ -350,6 +447,15 @@ export default function ReceptFormulär() {
             </div>
           ))}
         </div>
+
+        {aiImported && (
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5">
+              <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+            </svg>
+            <p className="text-sm text-amber-800 font-medium">Granskat av AI — kontrollera att allt stämmer innan du sparar</p>
+          </div>
+        )}
 
         {error && (
           <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-xl">{error}</p>
