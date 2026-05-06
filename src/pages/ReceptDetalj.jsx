@@ -19,10 +19,11 @@ function formatQty(n) {
 export default function ReceptDetalj() {
   const { id }     = useParams()
   const navigate   = useNavigate()
-  const [recipe, setRecipe]     = useState(null)
-  const [servings, setServings] = useState(null)
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState(null)
+  const [recipe, setRecipe]       = useState(null)
+  const [servings, setServings]   = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState(null)
+  const [imageOpen, setImageOpen] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -64,7 +65,9 @@ export default function ReceptDetalj() {
       {/* Image / hero */}
       <div className="relative">
         {recipe.image_url ? (
-          <img src={recipe.image_url} alt={recipe.title} className="w-full h-56 object-cover" />
+          <button type="button" onClick={() => setImageOpen(true)} className="w-full">
+            <img src={recipe.image_url} alt={recipe.title} className="w-full h-56 object-cover" />
+          </button>
         ) : (
           <div className="w-full h-40 bg-gradient-to-br from-forest-100 to-sand-200 flex items-center justify-center">
             <span className="text-6xl">🍽️</span>
@@ -207,6 +210,28 @@ export default function ReceptDetalj() {
           </a>
         )}
       </div>
+
+      {/* Lightbox */}
+      {imageOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          onClick={() => setImageOpen(false)}
+        >
+          <img
+            src={recipe.image_url}
+            alt={recipe.title}
+            className="max-w-full max-h-full object-contain"
+          />
+          <button
+            className="absolute top-12 right-4 w-9 h-9 bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-white"
+            onClick={() => setImageOpen(false)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
