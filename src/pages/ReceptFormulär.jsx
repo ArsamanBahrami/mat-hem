@@ -457,33 +457,35 @@ export default function ReceptFormulär() {
         <div className="bg-white rounded-2xl p-4 flex flex-col gap-2">
           <p className="font-semibold text-gray-700 mb-1">Ingredienser</p>
           {ingredients.map((ing, i) => (
-            <div key={i} className="flex gap-2 items-start">
+            <div key={i} className="flex flex-col gap-1.5 pb-2 border-b border-gray-50 last:border-0">
               <input
                 value={ing.name} onChange={e => updateIng(i, 'name', e.target.value)}
                 placeholder="Ingrediens"
-                className={inputCls + ' flex-[2]'}
+                className={inputCls}
               />
-              <input
-                type="number" min={0} step="any"
-                value={ing.quantity} onChange={e => updateIng(i, 'quantity', e.target.value)}
-                placeholder="Mängd"
-                className={inputCls + ' w-16 text-center'}
-              />
-              <select
-                value={ing.unit} onChange={e => updateIng(i, 'unit', e.target.value)}
-                className={inputCls + ' flex-1'}
-              >
-                <option value="">enhet</option>
-                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
-              {ingredients.length > 1 && (
-                <button type="button" onClick={() => removeIng(i)}
-                  className="w-8 h-10 flex items-center justify-center text-gray-400 hover:text-red-400 flex-shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                    <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              )}
+              <div className="flex gap-2">
+                <input
+                  type="number" min={0} step="any"
+                  value={ing.quantity} onChange={e => updateIng(i, 'quantity', e.target.value)}
+                  placeholder="Mängd"
+                  className="px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent w-20 text-center flex-shrink-0"
+                />
+                <select
+                  value={ing.unit} onChange={e => updateIng(i, 'unit', e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
+                >
+                  <option value="">enhet</option>
+                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+                {ingredients.length > 1 && (
+                  <button type="button" onClick={() => removeIng(i)}
+                    className="w-10 flex items-center justify-center text-gray-400 hover:text-red-400 flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                      <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           ))}
           <button type="button" onClick={addIng}
