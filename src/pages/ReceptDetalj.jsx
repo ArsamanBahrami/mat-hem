@@ -233,8 +233,8 @@ export default function ReceptDetalj() {
 
       {/* Bekräftelsedialog */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center">
-          <div className="w-full max-w-mobile bg-white rounded-t-3xl p-6 pb-8 flex flex-col gap-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center px-6">
+          <div className="w-full max-w-sm bg-white rounded-2xl p-6 flex flex-col gap-4 shadow-xl">
             <h3 className="font-bold text-gray-800 text-lg">Ta bort recept?</h3>
             <p className="text-gray-500 text-sm">Är du säker på att du vill ta bort <span className="font-semibold text-gray-700">{recipe.title}</span>? Detta går inte att ångra.</p>
             <div className="flex gap-3 mt-1">
