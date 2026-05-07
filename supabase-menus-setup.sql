@@ -46,7 +46,7 @@ BEGIN
   SELECT to_jsonb(m) INTO v_result
   FROM weekly_menus m
   WHERE m.household_id = v_household_id
-  ORDER BY m.week_start_date DESC
+  ORDER BY m.created_at DESC
   LIMIT 1;
 
   RETURN v_result;
@@ -64,7 +64,7 @@ BEGIN
   IF v_household_id IS NULL THEN RETURN '[]'::jsonb; END IF;
 
   RETURN (
-    SELECT coalesce(jsonb_agg(to_jsonb(m) ORDER BY m.week_start_date DESC), '[]'::jsonb)
+    SELECT coalesce(jsonb_agg(to_jsonb(m) ORDER BY m.created_at DESC), '[]'::jsonb)
     FROM weekly_menus m
     WHERE m.household_id = v_household_id
     LIMIT p_limit

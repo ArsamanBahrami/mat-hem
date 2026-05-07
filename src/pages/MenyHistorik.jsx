@@ -16,6 +16,12 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+function formatDateTime(isoStr) {
+  const d = new Date(isoStr)
+  return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }) +
+    ' ' + d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+}
+
 export default function MenyHistorik() {
   const navigate = useNavigate()
   const [menus,   setMenus]   = useState([])
@@ -71,11 +77,13 @@ export default function MenyHistorik() {
               <div key={menu.id} className="bg-white rounded-2xl shadow-sm p-4">
                 <div className="flex items-baseline justify-between mb-3">
                   <h2 className="font-bold text-gray-800">Vecka {isoWeek(menu.week_start_date)}</h2>
-                  <span className="text-xs text-gray-400">{formatDate(menu.week_start_date)}</span>
+                  <span className="text-xs text-gray-400">Sparad {formatDateTime(menu.created_at)}</span>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   {daysInMenu.map(day => {
-                    const recipe = menu.days[day] ? recipeMap[menu.days[day]] : null
+                    const val = menu.days[day]
+                    const rid = val && typeof val === 'object' ? val.recipe_id : val
+                    const recipe = rid ? recipeMap[rid] : null
                     return (
                       <div key={day} className="flex gap-3 items-center">
                         <span className="text-xs font-semibold text-gray-400 w-8 uppercase">{day.slice(0, 3)}</span>
