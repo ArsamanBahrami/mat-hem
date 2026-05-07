@@ -76,6 +76,9 @@ export default function Inkop() {
   // Add item manually
   const [addText, setAddText]       = useState('')
 
+  // Delete list confirm
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
   // Session
   const [session, setSession]       = useState(null)
 
@@ -228,6 +231,17 @@ export default function Inkop() {
       p_items:   [],
     })
     if (data) { setList(data); setItems([]); setPhase('list') }
+  }
+
+  // ── Delete shopping list ─────────────────────────────────────────────────
+  async function deleteList() {
+    if (!list || !session) return
+    await supabase.rpc('delete_shopping_list', { p_user_id: session.user.id, p_list_id: list.id })
+    localStorage.removeItem(QUEUE_KEY)
+    setList(null)
+    setItems([])
+    setConfirmDelete(false)
+    setPhase('empty')
   }
 
   // ── Open create-from-menu flow ──────────────────────────────────────────
@@ -398,7 +412,7 @@ export default function Inkop() {
           <div className="bg-white rounded-2xl shadow-sm p-5 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-gray-800">Välj veckomeny</h2>
-              <button onClick={() => setPhase('empty')} className="text-sm text-gray-400">Avbryt</button>
+              <button onClick={() => { setPhase(list ? 'list' : 'empty'); setConfirmDelete(false) }} className="text-sm text-gray-400">Avbryt</button>
             </div>
 
             {menus.length === 0 ? (
@@ -467,6 +481,27 @@ export default function Inkop() {
                     </>
                   ) : 'Generera inköpslista'}
                 </button>
+
+                {list && (
+                  <div className="border-t border-gray-100 pt-3">
+                    {confirmDelete ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-gray-500">Ta bort nuvarande inköpslista?</span>
+                        <div className="flex gap-2">
+                          <button onClick={() => setConfirmDelete(false)} className="text-sm text-gray-400 px-3 py-1.5">Avbryt</button>
+                          <button onClick={deleteList} className="text-sm text-red-600 font-semibold px-3 py-1.5 bg-red-50 rounded-xl">Ja, ta bort</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDelete(true)}
+                        className="w-full text-sm text-red-500 py-2 text-center"
+                      >
+                        Ta bort inköpslista
+                      </button>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
