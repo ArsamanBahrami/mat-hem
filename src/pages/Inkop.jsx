@@ -247,6 +247,7 @@ export default function Inkop() {
   // ── Open create-from-menu flow ──────────────────────────────────────────
   async function openCreateMenu() {
     setGenError(null)
+    setConfirmDelete(false)
     setPhase('create')
     if (menus.length === 0) {
       const [menuRes, recipeRes] = await Promise.all([
