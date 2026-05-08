@@ -268,6 +268,7 @@ export default function ReceptFormulär() {
       if (error) { setError(error.message); return }
       if (!data)  { setError('Receptet kunde inte sparas — försök igen.'); return }
 
+      window.dispatchEvent(new CustomEvent('recipe-saved'))
       navigate(`/recept/${data.id}`)
     } catch (err) {
       console.error('handleSubmit fel:', err)

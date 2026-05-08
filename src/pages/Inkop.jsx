@@ -146,6 +146,18 @@ export default function Inkop() {
     return () => window.removeEventListener('online', handleOnline)
   }, [session])
 
+  // ── Background sync: listen for SW message ──────────────────────────────
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const handler = event => {
+      if (event.data?.type === 'BG_SYNC_SHOPPING' && session && pendingRef.current) {
+        processQueue(session)
+      }
+    }
+    navigator.serviceWorker.addEventListener('message', handler)
+    return () => navigator.serviceWorker.removeEventListener('message', handler)
+  }, [session])
+
   async function processQueue(sess) {
     try {
       const pending = JSON.parse(localStorage.getItem(QUEUE_KEY) ?? 'null')
@@ -177,6 +189,12 @@ export default function Inkop() {
     } else {
       localStorage.setItem(QUEUE_KEY, JSON.stringify({ listId: list.id, items: newItems }))
       setPendingSync(true)
+      // Register background sync so SW can retry when network returns
+      if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        navigator.serviceWorker.ready
+          .then(reg => reg.sync.register('shopping-sync'))
+          .catch(() => {})
+      }
     }
   }
 

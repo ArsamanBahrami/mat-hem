@@ -13,6 +13,7 @@ import MenyNy from './pages/MenyNy'
 import MenyHistorik from './pages/MenyHistorik'
 import Inkop from './pages/Inkop'
 import OfflineBanner from './components/OfflineBanner'
+import InstallBanner from './components/InstallBanner'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -43,7 +44,7 @@ export default function App() {
     setLoading(true)
     supabase
       .from('profiles')
-      .select('*, households(name)')
+      .select('*, households(name, invite_code)')
       .eq('id', session.user.id)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -64,6 +65,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <OfflineBanner />
+      <InstallBanner />
       {!session ? (
         <Routes>
           <Route path="*" element={<Login />} />
