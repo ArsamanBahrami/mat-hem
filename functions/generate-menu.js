@@ -3,6 +3,7 @@ const SYSTEM_PROMPT =
   'Regler: 1) Variera proteinkällan — inte samma tagg två dagar i rad. 2) Blanda svårighetsgrader. ' +
   '3) Undvik recept som använts de senaste 2 veckorna. 4) Matcha budget-parametern. ' +
   '5) Följ kockfördelningen exakt om den anges. ' +
+  '6) Om fredagen är med, prioritera recept taggade "fredagsrätt" för fredagen. ' +
   'Svara ENDAST med giltig JSON: {"måndag": {"recipe_id": "uuid_eller_null", "cook": "Arsi"}, "tisdag": ..., osv}. ' +
   'Inkludera bara de dagar som efterfrågats. Använd null (inte strängen "null") för recipe_id om inget lämpligt recept finns.'
 
@@ -55,6 +56,7 @@ export const handler = async (event) => {
       ? `- Kockfördelning: Nikki lagar ${nikkiDays} ${nikkiDays === 1 ? 'dag' : 'dagar'} — dessa dagar MÅSTE ha taggen 'enkel'. Arsi lagar resten och klarar alla svårighetsgrader. Tilldela "cook": "Nikki" för Nikkis dagar och "cook": "Arsi" för Arsis dagar.`
       : `- Vem lagar: ${cook === 'Arsi' ? 'Arsi lagar alla dagar. Tilldela "cook": "Arsi" för alla dagar.' : 'Arsi och Nikki lagar tillsammans — fördelning valfri.'}`,
     avoid ? `- Undvik: ${avoid}` : null,
+    days.includes('fredag') ? `- Fredagsregel: fredag är inkluderad — välj ett recept med taggen 'fredagsrätt' till fredagen om ett sådant finns tillgängligt.` : null,
   ].filter(Boolean).join('\n')
 
   let aiResponse
