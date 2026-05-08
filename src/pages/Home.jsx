@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -34,12 +34,18 @@ const quickLinks = [
 
 export default function Home({ profile }) {
   const navigate = useNavigate()
-  const [copied, setCopied] = useState(false)
+  const [copied,     setCopied]     = useState(false)
+  const [inviteCode, setInviteCode] = useState(profile?.households?.invite_code ?? null)
+
+  useEffect(() => {
+    if (inviteCode) return
+    supabase.rpc('ensure_household_invite_code', { p_user_id: profile.id })
+      .then(({ data }) => { if (data) setInviteCode(data) })
+  }, [])
 
   function copyCode() {
-    const code = profile?.households?.invite_code
-    if (!code) return
-    navigator.clipboard.writeText(code).then(() => {
+    if (!inviteCode) return
+    navigator.clipboard.writeText(inviteCode).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
@@ -110,14 +116,14 @@ export default function Home({ profile }) {
         </div>
 
         {/* Inbjudningskod */}
-        {profile?.households?.invite_code && (
+        {inviteCode && (
           <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
               Inbjudningskod
             </p>
             <div className="flex items-center gap-3">
               <span className="text-2xl font-mono font-bold text-forest-700 tracking-widest flex-1">
-                {profile.households.invite_code}
+                {inviteCode}
               </span>
               <button
                 onClick={copyCode}
