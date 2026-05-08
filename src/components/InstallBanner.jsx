@@ -65,7 +65,7 @@ export default function InstallBanner() {
         </svg>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-800">Lägg till Mat-hem på hemskärmen</p>
+        <p className="text-sm font-semibold text-gray-800">Lägg till Matvis på hemskärmen</p>
         <p className="text-xs text-gray-500 mt-0.5">Bästa upplevelsen som app</p>
       </div>
       <div className="flex flex-col items-end gap-1.5 flex-shrink-0">

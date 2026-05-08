@@ -1,7 +1,7 @@
-# Mat-hem — instruktioner för Claude Code
+# Matvis — instruktioner för Claude Code
 
 ## Projekt
-Mat-hem är en mobil-first PWA för familjen Bahrami att hantera recept, veckomenyer och inköpslistor.
+Matvis är en mobil-first PWA för familjen Bahrami att hantera recept, veckomenyer och inköpslistor.
 Stack: React + Vite + Tailwind CSS + Supabase + Netlify.
 
 ## Allmänna regler

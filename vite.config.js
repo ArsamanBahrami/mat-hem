@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'Mat-hem',
-        short_name: 'Mat-hem',
-        description: 'Familjens app för recept, veckomenyer och inköpslistor',
+        name: 'Matvis',
+        short_name: 'Matvis',
+        description: 'Familjens smarta app för recept, veckomenyer och inköpslistor',
         theme_color: '#2d6a4f',
         background_color: '#f8f5f0',
         display: 'standalone',

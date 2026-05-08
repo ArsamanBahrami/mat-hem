@@ -1,7 +1,10 @@
 /**
  * Generates public/icon-192.png and public/icon-512.png.
  * Pure Node.js — no external dependencies.
- * Design: forest-green background (#2d6a4f) + white cooking pot (kastrull).
+ * Design: forest-green background + white happy robot (glad robot).
+ *   - Rounded square head with two green eyes and a big U-shaped smile
+ *   - Antenna stem + ball on top
+ *   - Solid background (maskable-safe, no transparent corners)
  * Run from project root: node scripts/generate-icons.mjs
  */
 
@@ -20,7 +23,6 @@ function crc32(buf) {
   for (const b of buf) c = CRCT[(c ^ b) & 0xff] ^ (c >>> 8)
   return (c ^ 0xffffffff) >>> 0
 }
-
 function pngChunk(type, data) {
   const t = Buffer.from(type, 'ascii')
   const l = Buffer.allocUnsafe(4); l.writeUInt32BE(data.length)
@@ -38,31 +40,48 @@ function inRR(x, y, l, t, r, b, rad) {
   return true
 }
 
-// ── Icon pixel (solid bg = maskable-safe) ────────────────────────────────────
+const BG    = [45, 106, 79, 255]   // forest green
+const WHITE = [255, 255, 255, 255]
+
+// ── Icon pixel ────────────────────────────────────────────────────────────────
 function pixel(x, y, S) {
-  const cx = S / 2, cy = S / 2
+  const cx = S / 2
 
-  // Pot body — slightly below center
-  const bW = S * 0.38, bH = S * 0.33
-  const bL = cx - bW / 2, bR = cx + bW / 2
-  const bT = cy - S * 0.055, bB = bT + bH
-  if (inRR(x, y, bL, bT, bR, bB, S * 0.055)) return [255, 255, 255, 255]
+  // ── Antenna ball ─────────────────────────────────────────────────────────
+  const ballCY = S * 0.085
+  const ballR  = S * 0.048
+  if ((x - cx) ** 2 + (y - ballCY) ** 2 <= ballR * ballR) return WHITE
 
-  // Lid
-  const lT = bT - S * 0.055, lB = bT + S * 0.01
-  if (inRR(x, y, bL + S * 0.015, lT, bR - S * 0.015, lB, S * 0.015)) return [255, 255, 255, 255]
+  // ── Antenna stem ─────────────────────────────────────────────────────────
+  const stemHW = S * 0.014
+  const stemT  = ballCY + ballR   // just below ball
+  const stemB  = S * 0.215        // just above head top
+  if (Math.abs(x - cx) <= stemHW && y >= stemT && y <= stemB) return WHITE
 
-  // Knob
-  if (inRR(x, y, cx - S * 0.042, lT - S * 0.055, cx + S * 0.042, lT, S * 0.016)) return [255, 255, 255, 255]
+  // ── Robot head ───────────────────────────────────────────────────────────
+  const hL = cx - S * 0.245, hR = cx + S * 0.245
+  const hT = S * 0.215,      hB = S * 0.765
+  const hRad = S * 0.055
+  if (!inRR(x, y, hL, hT, hR, hB, hRad)) return BG  // outside head → background
 
-  // Left handle
-  const hT = cy - S * 0.03, hB = cy + S * 0.045
-  if (inRR(x, y, bL - S * 0.09, hT, bL + S * 0.006, hB, S * 0.022)) return [255, 255, 255, 255]
-  // Right handle
-  if (inRR(x, y, bR - S * 0.006, hT, bR + S * 0.09, hB, S * 0.022)) return [255, 255, 255, 255]
+  // ── Eyes (green circles) ─────────────────────────────────────────────────
+  const eyeY = hT + (hB - hT) * 0.27
+  const eyeR = S * 0.058
+  const eyeOX = S * 0.1  // horizontal offset from center
+  if ((x - (cx - eyeOX)) ** 2 + (y - eyeY) ** 2 <= eyeR * eyeR) return BG
+  if ((x - (cx + eyeOX)) ** 2 + (y - eyeY) ** 2 <= eyeR * eyeR) return BG
 
-  // Forest green background
-  return [45, 106, 79, 255]
+  // ── Happy U-shaped smile ──────────────────────────────────────────────────
+  // Bottom-half arc of a circle: center above the arc → U opens upward = smile
+  const smCY    = hT + (hB - hT) * 0.50  // circle center (top of U)
+  const smR     = S * 0.185               // arc radius
+  const smThick = S * 0.030               // ring thickness
+  if (y >= smCY) {
+    const dist = Math.sqrt((x - cx) ** 2 + (y - smCY) ** 2)
+    if (dist >= smR - smThick && dist <= smR + smThick) return BG
+  }
+
+  return WHITE  // white head interior
 }
 
 // ── PNG builder ───────────────────────────────────────────────────────────────

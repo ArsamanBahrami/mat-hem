@@ -65,7 +65,7 @@ export const handler = async (event) => {
   try {
     const pageRes = await fetch(parsedUrl.href, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Mat-hem-bot/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; Matvis-bot/1.0)',
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'sv,en;q=0.9',
       },
