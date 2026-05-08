@@ -32,7 +32,7 @@ Stack: React + Vite + Tailwind CSS + Supabase + Netlify.
 ## Fas-status
 - Fas 1 ✅ Grund, auth, PWA, routing
 - Fas 2 ✅ Receptbank med manuell inmatning
-- Fas 3 ⏳ AI-bildtolkning (nästa)
+- Fas 3 ✅ AI-bildtolkning
 - Fas 4 ✅ Menygenerator
 - Fas 5 ✅ Inköpslista
-- Fas 6 ⌛ PWA-polish
+- Fas 6 ✅ PWA-polish
