@@ -12,10 +12,65 @@ const CORS = {
 }
 
 function extractOgImage(html) {
-  const m =
-    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
-  return m?.[1] ?? null
+  // Patterns ordered by priority. Each pair covers both attribute orders.
+  const patterns = [
+    // og:image (property)
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+    // og:image:url (property)
+    /<meta[^>]+property=["']og:image:url["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image:url["']/i,
+    // og:image (name)
+    /<meta[^>]+name=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']og:image["']/i,
+    // itemprop="image"
+    /<meta[^>]+itemprop=["']image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+itemprop=["']image["']/i,
+    // twitter:image (name or property)
+    /<meta[^>]+(?:name|property)=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+(?:name|property)=["']twitter:image["']/i,
+    // <link rel="image_src">
+    /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
+    /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']image_src["']/i,
+  ]
+
+  for (const pattern of patterns) {
+    const m = html.match(pattern)
+    if (m?.[1] && m[1].startsWith('http')) {
+      console.log('[parse-recipe-url] image found via meta pattern:', m[1])
+      return m[1]
+    }
+  }
+
+  // JSON-LD: look for Recipe or Article schema with image
+  const ldBlocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? []
+  for (const block of ldBlocks) {
+    const json = block.replace(/<[^>]+>/g, '')
+    try {
+      const data = JSON.parse(json)
+      const objs = Array.isArray(data) ? data : [data]
+      for (const obj of objs) {
+        const raw = obj.image ?? obj.thumbnailUrl
+        if (!raw) continue
+        const candidate = Array.isArray(raw) ? raw[0] : raw
+        const imgUrl = typeof candidate === 'string' ? candidate : candidate?.url
+        if (imgUrl && typeof imgUrl === 'string' && imgUrl.startsWith('http')) {
+          console.log('[parse-recipe-url] image found via JSON-LD:', imgUrl)
+          return imgUrl
+        }
+      }
+    } catch {}
+  }
+
+  // Debug: log the first image-related meta tags we actually found
+  const headMatch = html.match(/<head[\s\S]*?<\/head>/i)?.[0] ?? html.slice(0, 3000)
+  const metaLines = [...headMatch.matchAll(/<meta[^>]*(image|og:|twitter:)[^>]*>/gi)].map(m => m[0])
+  if (metaLines.length) {
+    console.log('[parse-recipe-url] image-related meta tags found:', metaLines.slice(0, 5))
+  } else {
+    console.log('[parse-recipe-url] no image meta tags found in <head>')
+  }
+  return null
 }
 
 function stripHtml(html) {
