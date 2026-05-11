@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { tagStyle } from '../lib/tags'
@@ -26,11 +26,37 @@ export default function ReceptDetalj() {
   const [imageOpen,    setImageOpen]    = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting,      setDeleting]      = useState(false)
+  const [collectionModal,     setCollectionModal]     = useState(false)
+  const [allCollections,      setAllCollections]      = useState([])
+  const [recipeCollectionIds, setRecipeCollectionIds] = useState(new Set())
+  const [collectionLoading,   setCollectionLoading]   = useState(false)
+  const [newColName,  setNewColName]  = useState('')
+  const [newColEmoji, setNewColEmoji] = useState('')
+  const [creatingCol, setCreatingCol] = useState(false)
+  const [showNewCol,  setShowNewCol]  = useState(false)
+  const userIdRef = useRef(null)
+
+  // Wake Lock — håller skärmen tänd under receptläsning
+  useEffect(() => {
+    if (!('wakeLock' in navigator)) return
+    let lock = null
+    async function acquire() {
+      try { lock = await navigator.wakeLock.request('screen') } catch {}
+    }
+    acquire()
+    const onVisibility = () => { if (document.visibilityState === 'visible') acquire() }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      lock?.release().catch(() => {})
+    }
+  }, [])
 
   useEffect(() => {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { navigate('/'); return }
+      userIdRef.current = session.user.id
 
       const { data, error } = await supabase.rpc('fetch_recipe', {
         p_user_id: session.user.id,
@@ -45,6 +71,56 @@ export default function ReceptDetalj() {
     }
     load()
   }, [id])
+
+  async function openCollectionModal() {
+    setCollectionModal(true)
+    setCollectionLoading(true)
+    const userId = userIdRef.current
+    const [colRes, rcRes] = await Promise.all([
+      supabase.rpc('fetch_collections', { p_user_id: userId }),
+      supabase.rpc('fetch_recipe_collections', { p_user_id: userId, p_recipe_id: id }),
+    ])
+    setAllCollections(colRes.data ?? [])
+    setRecipeCollectionIds(new Set((rcRes.data ?? []).map(c => c.id)))
+    setCollectionLoading(false)
+  }
+
+  async function toggleCollection(colId) {
+    const userId = userIdRef.current
+    if (recipeCollectionIds.has(colId)) {
+      setRecipeCollectionIds(prev => { const s = new Set(prev); s.delete(colId); return s })
+      await supabase.rpc('remove_recipe_from_collection', {
+        p_user_id: userId, p_collection_id: colId, p_recipe_id: id,
+      })
+    } else {
+      setRecipeCollectionIds(prev => new Set([...prev, colId]))
+      await supabase.rpc('add_recipe_to_collection', {
+        p_user_id: userId, p_collection_id: colId, p_recipe_id: id,
+      })
+    }
+  }
+
+  async function createAndAddCollection() {
+    if (!newColName.trim()) return
+    setCreatingCol(true)
+    const userId = userIdRef.current
+    const { data } = await supabase.rpc('create_collection', {
+      p_user_id: userId,
+      p_name:    newColName.trim(),
+      p_emoji:   newColEmoji.trim() || null,
+    })
+    if (data && !data.error) {
+      setAllCollections(prev => [data, ...prev])
+      setRecipeCollectionIds(prev => new Set([...prev, data.id]))
+      await supabase.rpc('add_recipe_to_collection', {
+        p_user_id: userId, p_collection_id: data.id, p_recipe_id: id,
+      })
+      setNewColName('')
+      setNewColEmoji('')
+      setShowNewCol(false)
+    }
+    setCreatingCol(false)
+  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -229,6 +305,17 @@ export default function ReceptDetalj() {
             Originalrecept
           </a>
         )}
+
+        {/* Samlingar */}
+        <button
+          onClick={openCollectionModal}
+          className="flex items-center gap-2 text-forest-600 text-sm font-medium"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+            <path d="M2 4.25A2.25 2.25 0 014.25 2h2.5A2.25 2.25 0 019 4.25v2.5A2.25 2.25 0 016.75 9h-2.5A2.25 2.25 0 012 6.75v-2.5zM2 11.25A2.25 2.25 0 014.25 9h2.5A2.25 2.25 0 019 11.25v2.5A2.25 2.25 0 016.75 16h-2.5A2.25 2.25 0 012 13.75v-2.5zM11 4.25A2.25 2.25 0 0113.25 2h2.5A2.25 2.25 0 0118 4.25v2.5A2.25 2.25 0 0115.75 9h-2.5A2.25 2.25 0 0111 6.75v-2.5zM15.25 11.75a.75.75 0 00-1.5 0v2h-2a.75.75 0 000 1.5h2v2a.75.75 0 001.5 0v-2h2a.75.75 0 000-1.5h-2v-2z" />
+          </svg>
+          Lägg till i samling
+        </button>
       </div>
 
       {/* Bekräftelsedialog */}
@@ -251,6 +338,118 @@ export default function ReceptDetalj() {
                 className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-semibold text-sm disabled:opacity-60 transition"
               >
                 {deleting ? 'Tar bort…' : 'Ta bort'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Samlingar-modal */}
+      {collectionModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center px-0">
+          <div className="w-full max-w-mobile bg-white rounded-t-3xl flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+              <h3 className="font-bold text-gray-800 text-base">Lägg till i samling</h3>
+              <button
+                onClick={() => { setCollectionModal(false); setShowNewCol(false) }}
+                className="w-8 h-8 flex items-center justify-center text-gray-400"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-5 py-3 flex flex-col gap-2">
+              {collectionLoading ? (
+                <div className="flex flex-col gap-2 py-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-12 bg-gray-100 rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              ) : allCollections.length === 0 && !showNewCol ? (
+                <p className="text-gray-400 text-sm text-center py-6">
+                  Inga samlingar ännu — skapa din första nedan!
+                </p>
+              ) : (
+                allCollections.map(col => {
+                  const inCol = recipeCollectionIds.has(col.id)
+                  return (
+                    <button
+                      key={col.id}
+                      onClick={() => toggleCollection(col.id)}
+                      className="flex items-center gap-3 py-3 px-3 rounded-xl hover:bg-sand-50 active:bg-sand-100 transition text-left"
+                    >
+                      <span className="text-xl w-8 text-center">{col.emoji || '📁'}</span>
+                      <span className="flex-1 text-sm font-medium text-gray-800">{col.name}</span>
+                      <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                        inCol ? 'bg-forest-600 border-forest-600' : 'border-gray-300'
+                      }`}>
+                        {inCol && (
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" className="w-3 h-3">
+                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </span>
+                    </button>
+                  )
+                })
+              )}
+
+              {showNewCol ? (
+                <div className="flex flex-col gap-2 pt-1">
+                  <div className="flex gap-2">
+                    <input
+                      value={newColEmoji}
+                      onChange={e => setNewColEmoji(e.target.value)}
+                      placeholder="🍽️"
+                      maxLength={2}
+                      className="w-14 text-center text-xl px-2 py-2 rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
+                    />
+                    <input
+                      value={newColName}
+                      onChange={e => setNewColName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && createAndAddCollection()}
+                      placeholder="Namn på samling"
+                      className="flex-1 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-forest-400 focus:border-transparent"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setShowNewCol(false); setNewColName(''); setNewColEmoji('') }}
+                      className="flex-1 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm font-medium"
+                    >
+                      Avbryt
+                    </button>
+                    <button
+                      onClick={createAndAddCollection}
+                      disabled={!newColName.trim() || creatingCol}
+                      className="flex-1 py-2.5 bg-forest-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                    >
+                      {creatingCol ? 'Skapar…' : 'Skapa och lägg till'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowNewCol(true)}
+                  className="flex items-center gap-2 text-forest-600 text-sm font-semibold py-2 px-3"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" clipRule="evenodd" />
+                  </svg>
+                  Ny samling
+                </button>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => { setCollectionModal(false); setShowNewCol(false) }}
+                className="w-full py-3 bg-forest-600 text-white rounded-2xl font-semibold text-sm"
+              >
+                Klar
               </button>
             </div>
           </div>

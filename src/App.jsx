@@ -12,6 +12,7 @@ import Meny from './pages/Meny'
 import MenyNy from './pages/MenyNy'
 import MenyHistorik from './pages/MenyHistorik'
 import Inkop from './pages/Inkop'
+import SamlingDetalj from './pages/SamlingDetalj'
 import OfflineBanner from './components/OfflineBanner'
 import InstallBanner from './components/InstallBanner'
 
@@ -86,6 +87,7 @@ export default function App() {
             <Route path="/meny/ny" element={<MenyNy />} />
             <Route path="/meny/historik" element={<MenyHistorik />} />
             <Route path="/inkop" element={<Inkop />} />
+            <Route path="/samlingar/:id" element={<SamlingDetalj />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
