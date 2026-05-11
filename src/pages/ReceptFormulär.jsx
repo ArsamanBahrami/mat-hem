@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { TAG_GROUPS, tagStyle } from '../lib/tags'
 
@@ -9,9 +9,10 @@ const EMPTY_STEP = (n) => ({ step: n, text: '' })
 const UNITS = ['g', 'kg', 'ml', 'dl', 'l', 'msk', 'tsk', 'krm', 'st', 'näve', 'klyfta', 'burk', 'förp']
 
 export default function ReceptFormulär() {
-  const { id }   = useParams()
-  const navigate = useNavigate()
-  const isEdit   = Boolean(id)
+  const { id }          = useParams()
+  const navigate        = useNavigate()
+  const [searchParams]  = useSearchParams()
+  const isEdit          = Boolean(id)
 
   const [title,       setTitle]       = useState('')
   const [description, setDescription] = useState('')
@@ -59,6 +60,21 @@ export default function ReceptFormulär() {
     }
     load()
   }, [id])
+
+  // ── Share Target auto-import ─────────────────────────
+  useEffect(() => {
+    if (isEdit) return
+    const sharedUrl  = searchParams.get('url')  || searchParams.get('text') || ''
+    const sharedText = searchParams.get('title') || ''
+    if (sharedUrl && sharedUrl.startsWith('http')) {
+      setImportUrl(sharedUrl)
+      setUrlImport(true)
+      if (sharedText) setTitle(sharedText)
+      // Trigger import after state has settled
+      setTimeout(() => handleUrlImport(sharedUrl), 0)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Ingredients ──────────────────────────────────────
   function updateIng(i, field, val) {
@@ -165,8 +181,9 @@ export default function ReceptFormulär() {
   }
 
   // ── URL-import ───────────────────────────────────────
-  async function handleUrlImport() {
-    if (!importUrl.trim()) return
+  async function handleUrlImport(overrideUrl) {
+    const url = (typeof overrideUrl === 'string' ? overrideUrl : importUrl).trim()
+    if (!url) return
     setError(null)
     setFetchingUrl(true)
     setAiImported(false)
@@ -175,7 +192,7 @@ export default function ReceptFormulär() {
       const res  = await fetch('/.netlify/functions/parse-recipe-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: importUrl.trim() }),
+        body: JSON.stringify({ url }),
       })
       const json = await res.json()
 
@@ -205,7 +222,11 @@ export default function ReceptFormulär() {
       if (json.suggested_tags?.length) {
         setTags(json.suggested_tags.filter(t => t))
       }
-      setSourceUrl(importUrl.trim())
+      if (json.image_url) {
+        setImagePreview(json.image_url)
+        setExistingImg(json.image_url)
+      }
+      setSourceUrl(url)
       setAiImported(true)
       setUrlImport(false)
     } catch (err) {

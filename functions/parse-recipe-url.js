@@ -11,6 +11,13 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
+function extractOgImage(html) {
+  const m =
+    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+  return m?.[1] ?? null
+}
+
 function stripHtml(html) {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -62,6 +69,7 @@ export const handler = async (event) => {
 
   // Fetch the page HTML
   let pageHtml
+  let ogImage = null
   try {
     const pageRes = await fetch(parsedUrl.href, {
       headers: {
@@ -76,6 +84,7 @@ export const handler = async (event) => {
       return { statusCode: 422, headers: CORS, body: JSON.stringify({ error: `Kunde inte hämta sidan (HTTP ${pageRes.status})` }) }
     }
     pageHtml = await pageRes.text()
+    ogImage = extractOgImage(pageHtml)
   } catch (err) {
     return { statusCode: 422, headers: CORS, body: JSON.stringify({ error: `Kunde inte nå sidan: ${err.message}` }) }
   }
@@ -126,6 +135,6 @@ export const handler = async (event) => {
   return {
     statusCode: 200,
     headers: { ...CORS, 'Content-Type': 'application/json' },
-    body: JSON.stringify(parsed),
+    body: JSON.stringify(ogImage ? { ...parsed, image_url: ogImage } : parsed),
   }
 }
