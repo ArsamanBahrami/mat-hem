@@ -15,6 +15,7 @@ import Inkop from './pages/Inkop'
 import SamlingDetalj from './pages/SamlingDetalj'
 import OfflineBanner from './components/OfflineBanner'
 import InstallBanner from './components/InstallBanner'
+import PwaOnboarding from './components/PwaOnboarding'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -76,6 +77,8 @@ export default function App() {
           <Route path="*" element={<Onboarding onComplete={setProfile} userId={session.user.id} />} />
         </Routes>
       ) : (
+        <>
+        <PwaOnboarding />
         <Routes>
           <Route element={<Layout profile={profile} />}>
             <Route path="/" element={<Home profile={profile} />} />
@@ -91,6 +94,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
+        </>
       )}
     </BrowserRouter>
   )
