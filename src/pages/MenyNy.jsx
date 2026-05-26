@@ -83,10 +83,10 @@ function SwapModal({ options, onSelect, onClose }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-mobile bg-white rounded-t-3xl p-5 pb-8 flex flex-col gap-4"
+        className="w-full max-w-mobile bg-white rounded-t-3xl p-5 pb-8 flex flex-col gap-4 max-h-[85vh]"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-shrink-0">
           <h3 className="font-bold text-gray-800">Välj ett alternativ</h3>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center text-gray-400">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
@@ -97,7 +97,7 @@ function SwapModal({ options, onSelect, onClose }) {
         {options.length === 0 ? (
           <p className="text-gray-400 text-sm italic text-center py-4">Inga alternativ kvar i receptbanken</p>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 overflow-y-auto">
             {options.map(recipe => {
               const totalMin = (recipe.prep_time_min ?? 0) + (recipe.cook_time_min ?? 0)
               return (
