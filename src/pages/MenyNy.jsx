@@ -97,7 +97,7 @@ function SwapModal({ options, onSelect, onClose }) {
         {options.length === 0 ? (
           <p className="text-gray-400 text-sm italic text-center py-4">Inga alternativ kvar i receptbanken</p>
         ) : (
-          <div className="flex flex-col gap-3 overflow-y-auto">
+          <div className="flex flex-col gap-3 overflow-y-auto min-h-0">
             {options.map(recipe => {
               const totalMin = (recipe.prep_time_min ?? 0) + (recipe.cook_time_min ?? 0)
               return (
