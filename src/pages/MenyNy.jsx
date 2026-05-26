@@ -78,30 +78,29 @@ function MiniCard({ recipe, onSwap }) {
 // ── Swap modal ───────────────────────────────────────────────────────────────
 function SwapModal({ options, onSelect, onClose }) {
   useEffect(() => {
-    const scrollY = window.scrollY
-    document.body.style.position = 'fixed'
-    document.body.style.top = `-${scrollY}px`
-    document.body.style.width = '100%'
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
     return () => {
-      document.body.style.position = ''
-      document.body.style.top = ''
-      document.body.style.width = ''
-      window.scrollTo(0, scrollY)
+      document.documentElement.style.overflow = ''
+      document.body.style.overflow = ''
     }
   }, [])
 
   return (
-    <div
-      style={{ position: 'fixed', inset: 0, zIndex: 50, overflow: 'hidden', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
-      onClick={onClose}
-    >
+    <>
+      {/* Overlay */}
       <div
-        style={{ position: 'fixed', bottom: 0, left: 0, right: 0, maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
-        className="bg-white rounded-t-3xl"
-        onClick={e => e.stopPropagation()}
+        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 50 }}
+        onClick={onClose}
+      />
+      {/* Modal box */}
+      <div
+        style={{ position: 'fixed', left: 0, right: 0, bottom: 0, height: '70vh', background: 'white', borderRadius: '24px 24px 0 0', zIndex: 51 }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between flex-shrink-0 px-5 pt-5 pb-3">
+        <div
+          style={{ height: '60px', flexShrink: 0, borderBottom: '1px solid #f0ede8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px' }}
+        >
           <h3 className="font-bold text-gray-800">Välj ett alternativ</h3>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center text-gray-400">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
@@ -109,46 +108,47 @@ function SwapModal({ options, onSelect, onClose }) {
             </svg>
           </button>
         </div>
-        {/* List */}
-        {options.length === 0 ? (
-          <p className="text-gray-400 text-sm italic text-center py-4 px-5 pb-8">Inga alternativ kvar i receptbanken</p>
-        ) : (
-          <div
-            style={{ flex: 1, overflowY: 'scroll', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
-            className="flex flex-col gap-3 px-5 pb-8"
-          >
-            {options.map(recipe => {
-              const totalMin = (recipe.prep_time_min ?? 0) + (recipe.cook_time_min ?? 0)
-              return (
-                <button
-                  key={recipe.id}
-                  type="button"
-                  onClick={() => onSelect(recipe.id)}
-                  className="flex gap-3 items-center bg-sand-50 rounded-xl p-3 text-left active:bg-sand-100 transition"
-                >
-                  {recipe.image_url ? (
-                    <img src={recipe.image_url} alt={recipe.title} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
-                  ) : (
-                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-forest-50 to-sand-100 flex items-center justify-center flex-shrink-0">
-                      <span className="text-2xl">🍽️</span>
+        {/* Scroll container */}
+        <div
+          style={{ position: 'absolute', top: '60px', left: 0, right: 0, bottom: 0, overflowY: 'scroll', WebkitOverflowScrolling: 'touch' }}
+        >
+          {options.length === 0 ? (
+            <p className="text-gray-400 text-sm italic text-center py-4 px-5">Inga alternativ kvar i receptbanken</p>
+          ) : (
+            <div className="flex flex-col gap-3 p-5">
+              {options.map(recipe => {
+                const totalMin = (recipe.prep_time_min ?? 0) + (recipe.cook_time_min ?? 0)
+                return (
+                  <button
+                    key={recipe.id}
+                    type="button"
+                    onClick={() => onSelect(recipe.id)}
+                    className="flex gap-3 items-center bg-sand-50 rounded-xl p-3 text-left active:bg-sand-100 transition"
+                  >
+                    {recipe.image_url ? (
+                      <img src={recipe.image_url} alt={recipe.title} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-forest-50 to-sand-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-2xl">🍽️</span>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{recipe.title}</p>
+                      <div className="flex gap-1.5 mt-1 flex-wrap">
+                        {(recipe.tags ?? []).slice(0, 2).map(tag => (
+                          <span key={tag} className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${tagStyle(tag)}`}>{tag}</span>
+                        ))}
+                        {totalMin > 0 && <span className="text-xs text-gray-400">{totalMin} min</span>}
+                      </div>
                     </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{recipe.title}</p>
-                    <div className="flex gap-1.5 mt-1 flex-wrap">
-                      {(recipe.tags ?? []).slice(0, 2).map(tag => (
-                        <span key={tag} className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${tagStyle(tag)}`}>{tag}</span>
-                      ))}
-                      {totalMin > 0 && <span className="text-xs text-gray-400">{totalMin} min</span>}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
