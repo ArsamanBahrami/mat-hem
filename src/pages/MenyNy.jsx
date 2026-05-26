@@ -77,6 +77,11 @@ function MiniCard({ recipe, onSwap }) {
 
 // ── Swap modal ───────────────────────────────────────────────────────────────
 function SwapModal({ options, onSelect, onClose }) {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center"
@@ -85,6 +90,7 @@ function SwapModal({ options, onSelect, onClose }) {
       <div
         className="w-full max-w-mobile bg-white rounded-t-3xl p-5 pb-8 flex flex-col gap-4 max-h-[85vh]"
         onClick={e => e.stopPropagation()}
+        onTouchMove={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between flex-shrink-0">
           <h3 className="font-bold text-gray-800">Välj ett alternativ</h3>
@@ -97,7 +103,10 @@ function SwapModal({ options, onSelect, onClose }) {
         {options.length === 0 ? (
           <p className="text-gray-400 text-sm italic text-center py-4">Inga alternativ kvar i receptbanken</p>
         ) : (
-          <div className="flex flex-col gap-3 overflow-y-auto min-h-0">
+          <div
+            className="flex flex-col gap-3 overflow-y-scroll min-h-0"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
             {options.map(recipe => {
               const totalMin = (recipe.prep_time_min ?? 0) + (recipe.cook_time_min ?? 0)
               return (
