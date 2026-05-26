@@ -77,6 +77,8 @@ function MiniCard({ recipe, onSwap }) {
 
 // ── Swap modal ───────────────────────────────────────────────────────────────
 function SwapModal({ options, onSelect, onClose }) {
+  const [query, setQuery] = useState('')
+
   useEffect(() => {
     document.documentElement.style.overflow = 'hidden'
     document.body.style.overflow = 'hidden'
@@ -85,6 +87,14 @@ function SwapModal({ options, onSelect, onClose }) {
       document.body.style.overflow = ''
     }
   }, [])
+
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? options.filter(r =>
+        r.title.toLowerCase().includes(q) ||
+        (r.ingredients ?? []).some(ing => ing.name?.toLowerCase().includes(q))
+      )
+    : options
 
   return (
     <>
@@ -108,15 +118,25 @@ function SwapModal({ options, onSelect, onClose }) {
             </svg>
           </button>
         </div>
+        {/* Search */}
+        <div style={{ padding: '10px 20px', borderBottom: '1px solid #f0ede8' }}>
+          <input
+            type="search"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Sök recept eller ingrediens…"
+            className="w-full bg-gray-100 rounded-xl px-4 py-2 text-sm outline-none placeholder-gray-400"
+          />
+        </div>
         {/* Scroll container */}
         <div
-          style={{ position: 'absolute', top: '60px', left: 0, right: 0, bottom: 0, overflowY: 'scroll', WebkitOverflowScrolling: 'touch' }}
+          style={{ position: 'absolute', top: '113px', left: 0, right: 0, bottom: 0, overflowY: 'scroll', WebkitOverflowScrolling: 'touch' }}
         >
-          {options.length === 0 ? (
-            <p className="text-gray-400 text-sm italic text-center py-4 px-5">Inga alternativ kvar i receptbanken</p>
+          {filtered.length === 0 ? (
+            <p className="text-gray-400 text-sm italic text-center py-4 px-5">Inga recept matchar sökningen</p>
           ) : (
             <div className="flex flex-col gap-3 p-5">
-              {options.map(recipe => {
+              {filtered.map(recipe => {
                 const totalMin = (recipe.prep_time_min ?? 0) + (recipe.cook_time_min ?? 0)
                 return (
                   <button
@@ -234,14 +254,9 @@ export default function MenyNy() {
   }
 
   function openSwap(day) {
-    const usedIds = new Set(
-      Object.entries(generatedMenu)
-        .filter(([d]) => d !== day)
-        .map(([, v]) => v?.recipe_id)
-        .filter(Boolean)
-    )
-    const pool = recipes.filter(r => !usedIds.has(r.id))
-    setSwapOptions(shuffle(pool).slice(0, 3))
+    const currentId = generatedMenu[day]?.recipe_id
+    const pool = recipes.filter(r => r.id !== currentId)
+    setSwapOptions(shuffle(pool))
     setSwapDay(day)
   }
 
