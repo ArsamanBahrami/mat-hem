@@ -13,6 +13,7 @@ import MenyNy from './pages/MenyNy'
 import MenyHistorik from './pages/MenyHistorik'
 import Inkop from './pages/Inkop'
 import SamlingDetalj from './pages/SamlingDetalj'
+import Installningar from './pages/Installningar'
 import OfflineBanner from './components/OfflineBanner'
 import InstallBanner from './components/InstallBanner'
 import PwaOnboarding from './components/PwaOnboarding'
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="/meny/historik" element={<MenyHistorik />} />
             <Route path="/inkop" element={<Inkop />} />
             <Route path="/samlingar/:id" element={<SamlingDetalj />} />
+            <Route path="/installningar" element={<Installningar profile={profile} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
