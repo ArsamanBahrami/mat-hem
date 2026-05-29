@@ -12,6 +12,83 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function log(tag, msg, extra) {
+  const line = `[parse-recipe-url] [${tag}] ${msg}`
+  if (extra !== undefined) console.log(line, extra)
+  else console.log(line)
+}
+
+function instagramHeaders() {
+  return {
+    'User-Agent':      'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+    'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.8',
+    'Referer':         'https://www.instagram.com/',
+  }
+}
+
+function genericHeaders() {
+  return {
+    'User-Agent':      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.8',
+  }
+}
+
+// Fetch with one automatic retry after 2s if content is too short or fails
+async function fetchPage(href, isInstagram, reqId) {
+  const headers = isInstagram ? instagramHeaders() : genericHeaders()
+  const opts    = { headers, redirect: 'follow', signal: AbortSignal.timeout(15000) }
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    if (attempt === 2) {
+      log(reqId, `retrying after 2s delay (attempt ${attempt})`)
+      await new Promise(r => setTimeout(r, 2000))
+    }
+    try {
+      const res  = await fetch(href, opts)
+      const html = await res.text()
+      log(reqId, `attempt ${attempt}: HTTP ${res.status}, HTML ${html.length} chars`)
+      if (!res.ok) {
+        if (attempt === 2) return { error: `HTTP ${res.status} från sidan` }
+        continue
+      }
+      if (html.length < 500) {
+        log(reqId, `attempt ${attempt}: HTML for short (${html.length} chars), will retry`)
+        if (attempt === 2) return { error: 'För lite innehåll hämtades från sidan' }
+        continue
+      }
+      return { html, status: res.status }
+    } catch (err) {
+      log(reqId, `attempt ${attempt}: fetch error: ${err.message}`)
+      if (attempt === 2) return { error: `Nätverksfel: ${err.message}` }
+    }
+  }
+  return { error: 'Okänt fel vid hämtning' }
+}
+
+// Extract Recipe-type JSON-LD objects — gives Claude the cleanest possible signal
+function extractJsonLd(html) {
+  const blocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? []
+  const recipes = []
+  for (const block of blocks) {
+    const raw = block.replace(/<[^>]+>/g, '')
+    try {
+      const data = JSON.parse(raw)
+      const objs = Array.isArray(data) ? data : [data]
+      for (const obj of objs) {
+        const type = Array.isArray(obj['@type']) ? obj['@type'] : [obj['@type']]
+        if (type.includes('Recipe') || obj.recipeIngredient || obj.recipeInstructions) {
+          recipes.push(obj)
+        }
+      }
+    } catch {}
+  }
+  return recipes.length > 0 ? JSON.stringify(recipes, null, 2) : null
+}
+
 function extractOgImage(html) {
   const patterns = [
     /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
@@ -27,45 +104,28 @@ function extractOgImage(html) {
     /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i,
     /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']image_src["']/i,
   ]
-
-  for (const pattern of patterns) {
-    const m = html.match(pattern)
-    if (m?.[1] && m[1].startsWith('http')) {
-      console.log('[parse-recipe-url] image found via meta pattern:', m[1])
-      return m[1]
-    }
+  for (const p of patterns) {
+    const m = html.match(p)
+    if (m?.[1]?.startsWith('http')) return m[1]
   }
-
+  // JSON-LD fallback
   const ldBlocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? []
   for (const block of ldBlocks) {
-    const json = block.replace(/<[^>]+>/g, '')
     try {
-      const data = JSON.parse(json)
+      const data = JSON.parse(block.replace(/<[^>]+>/g, ''))
       const objs = Array.isArray(data) ? data : [data]
       for (const obj of objs) {
         const raw = obj.image ?? obj.thumbnailUrl
         if (!raw) continue
         const candidate = Array.isArray(raw) ? raw[0] : raw
-        const imgUrl = typeof candidate === 'string' ? candidate : candidate?.url
-        if (imgUrl && typeof imgUrl === 'string' && imgUrl.startsWith('http')) {
-          console.log('[parse-recipe-url] image found via JSON-LD:', imgUrl)
-          return imgUrl
-        }
+        const url = typeof candidate === 'string' ? candidate : candidate?.url
+        if (url?.startsWith('http')) return url
       }
     } catch {}
-  }
-
-  const headMatch = html.match(/<head[\s\S]*?<\/head>/i)?.[0] ?? html.slice(0, 3000)
-  const metaLines = [...headMatch.matchAll(/<meta[^>]*(image|og:|twitter:)[^>]*>/gi)].map(m => m[0])
-  if (metaLines.length) {
-    console.log('[parse-recipe-url] image-related meta tags found:', metaLines.slice(0, 5))
-  } else {
-    console.log('[parse-recipe-url] no image meta tags found in <head>')
   }
   return null
 }
 
-// Extracts og:description or meta description — Instagram puts the full caption here
 function extractCaption(html) {
   const patterns = [
     /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']{20,})["']/i,
@@ -77,16 +137,17 @@ function extractCaption(html) {
     const m = html.match(p)
     if (m?.[1]) {
       return m[1]
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&#10;/g, '\n')
-        .replace(/&#13;/g, '')
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+        .replace(/&#10;/g, '\n').replace(/&#13;/g, '')
     }
   }
   return null
+}
+
+function extractAllMetaTags(html) {
+  const head = html.match(/<head[\s\S]*?<\/head>/i)?.[0] ?? html.slice(0, 4000)
+  return [...head.matchAll(/<meta[^>]+>/gi)].map(m => m[0]).slice(0, 20)
 }
 
 function stripHtml(html) {
@@ -94,18 +155,13 @@ function stripHtml(html) {
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s{2,}/g, ' ')
-    .trim()
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\s{2,}/g, ' ').trim()
 }
 
-async function callClaude(apiKey, textForClaude) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callClaude(apiKey, prompt) {
+  return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,
@@ -116,141 +172,130 @@ async function callClaude(apiKey, textForClaude) {
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: textForClaude }],
+      messages: [{ role: 'user', content: prompt }],
     }),
   })
-  return res
 }
 
-export const handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: CORS, body: '' }
+async function askClaude(apiKey, prompt, reqId, label) {
+  log(reqId, `calling Claude (${label}), prompt length: ${prompt.length}`)
+  let res
+  try {
+    res = await callClaude(apiKey, prompt)
+  } catch (err) {
+    log(reqId, `Claude network error (${label}): ${err.message}`)
+    return { error: `Nätverksfel mot Anthropic: ${err.message}` }
   }
+  if (!res.ok) {
+    const t = await res.text()
+    log(reqId, `Claude API error (${label}) ${res.status}: ${t.slice(0, 200)}`)
+    return { error: `Anthropic API-fel (${res.status})` }
+  }
+  const data    = await res.json()
+  const rawText = data.content?.[0]?.text ?? ''
+  log(reqId, `Claude raw response (${label}):`, rawText.slice(0, 600))
+  try {
+    return { parsed: JSON.parse(rawText), rawText }
+  } catch {
+    log(reqId, `JSON parse failed (${label}), raw: ${rawText.slice(0, 300)}`)
+    return { error: `Kunde inte tolka AI-svaret som JSON: ${rawText.slice(0, 150)}` }
+  }
+}
 
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) }
-  }
+// ── Handler ───────────────────────────────────────────────────────────────────
+
+export const handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' }
+  if (event.httpMethod !== 'POST')    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'ANTHROPIC_API_KEY saknas på servern' }) }
-  }
+  if (!apiKey) return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'ANTHROPIC_API_KEY saknas på servern' }) }
 
   let body
-  try {
-    body = JSON.parse(event.body ?? '{}')
-  } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Ogiltig JSON i request body' }) }
-  }
+  try { body = JSON.parse(event.body ?? '{}') }
+  catch { return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Ogiltig JSON i request body' }) } }
 
   const { url } = body
-  if (!url) {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'url krävs' }) }
-  }
+  if (!url) return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'url krävs' }) }
 
   let parsedUrl
   try {
     parsedUrl = new URL(url)
     if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error()
-  } catch {
-    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Ogiltig URL' }) }
-  }
+  } catch { return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: 'Ogiltig URL' }) } }
 
-  // Fetch the page HTML
-  let pageHtml
-  let ogImage = null
-  try {
-    const pageRes = await fetch(parsedUrl.href, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Matvis-bot/1.0)',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'sv,en;q=0.9',
-      },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(10000),
-    })
-    if (!pageRes.ok) {
-      return { statusCode: 422, headers: CORS, body: JSON.stringify({ error: `Kunde inte hämta sidan (HTTP ${pageRes.status})` }) }
-    }
-    pageHtml = await pageRes.text()
-    ogImage = extractOgImage(pageHtml)
-  } catch (err) {
-    return { statusCode: 422, headers: CORS, body: JSON.stringify({ error: `Kunde inte nå sidan: ${err.message}` }) }
-  }
-
-  const pageText  = stripHtml(pageHtml).slice(0, 15000)
-  const caption   = extractCaption(pageHtml)
+  const reqId       = Math.random().toString(36).slice(2, 7)
   const isInstagram = parsedUrl.hostname.includes('instagram.com')
 
-  console.log('[parse-recipe-url] url:', parsedUrl.href)
-  console.log('[parse-recipe-url] pageText length:', pageText.length)
-  console.log('[parse-recipe-url] caption found:', caption ? `yes (${caption.length} chars)` : 'no')
+  log(reqId, `START url=${parsedUrl.href} instagram=${isInstagram}`)
 
-  // Build prompt — for Instagram or when caption is long, prioritise the caption
+  // ── 1. Fetch page ──
+  const fetchResult = await fetchPage(parsedUrl.href, isInstagram, reqId)
+  if (fetchResult.error) {
+    const userMsg = isInstagram && fetchResult.error.includes('HTTP')
+      ? 'Instagram blockerade hämtningen — försök igen om några sekunder eller använd bildimport istället'
+      : fetchResult.error
+    log(reqId, `FAIL fetch: ${fetchResult.error}`)
+    return { statusCode: 422, headers: CORS, body: JSON.stringify({ error: userMsg }) }
+  }
+
+  const { html } = fetchResult
+  const ogImage  = extractOgImage(html)
+  const caption  = extractCaption(html)
+  const jsonLd   = extractJsonLd(html)
+  const allMeta  = extractAllMetaTags(html)
+
+  log(reqId, `html=${html.length}c, ogImage=${ogImage ? 'yes' : 'no'}, caption=${caption ? caption.length + 'c' : 'no'}, jsonLd=${jsonLd ? 'yes' : 'no'}`)
+  log(reqId, `meta tags found:`, allMeta)
+
+  // ── 2. Build prompt — JSON-LD first, then caption, then plain text ──
   let prompt
-  if (caption && (isInstagram || caption.length > 200)) {
+  if (jsonLd) {
     prompt =
-      `Extrahera receptet från denna text. Bildtexten/caption kan innehålla hela receptet:\n\n` +
-      `BILDTEXT/CAPTION:\n${caption}\n\n` +
-      `ÖVRIG SIDTEXT:\n${pageText.slice(0, 8000)}`
+      `Extrahera receptet från dessa JSON-LD strukturerade data:\n\n${jsonLd}` +
+      (caption ? `\n\nBILDTEXT/CAPTION:\n${caption}` : '')
+  } else if (caption && (isInstagram || caption.length > 200)) {
+    prompt =
+      `Extrahera receptet. Bildtexten innehåller troligen hela receptet:\n\nBILDTEXT/CAPTION:\n${caption}\n\nÖVRIG SIDTEXT:\n${stripHtml(html).slice(0, 8000)}`
   } else {
-    prompt = `Extrahera receptet från denna webbsida:\n\n${pageText}`
+    prompt = `Extrahera receptet från denna webbsida:\n\n${stripHtml(html).slice(0, 15000)}`
   }
 
-  // Call Anthropic
-  let aiResponse
-  try {
-    aiResponse = await callClaude(apiKey, prompt)
-  } catch (err) {
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: `Nätverksfel mot Anthropic: ${err.message}` }) }
+  // ── 3. Ask Claude ──
+  const result = await askClaude(apiKey, prompt, reqId, jsonLd ? 'json-ld' : caption ? 'caption' : 'html')
+
+  if (result.error) {
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: result.error }) }
   }
 
-  if (!aiResponse.ok) {
-    const errText = await aiResponse.text()
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: `Anthropic API-fel (${aiResponse.status}): ${errText}` }) }
-  }
+  let parsed = result.parsed
 
-  const aiData  = await aiResponse.json()
-  const rawText = aiData.content?.[0]?.text ?? ''
-
-  let parsed
-  try {
-    parsed = JSON.parse(rawText)
-  } catch {
-    console.error('[parse-recipe-url] JSON parse failed. Claude raw response:', rawText.slice(0, 500))
-    return {
-      statusCode: 502,
-      headers: CORS,
-      body: JSON.stringify({ error: `Kunde inte tolka AI-svaret som JSON. Svar från Claude: ${rawText.slice(0, 200)}` }),
-    }
-  }
-
-  // If Claude found no recipe and we have a caption we haven't tried alone yet, retry with caption only
-  if (parsed.error && caption && !isInstagram && caption.length > 100) {
-    console.log('[parse-recipe-url] first attempt failed:', parsed.error, '— retrying with caption only')
-    try {
-      const retryRes = await callClaude(apiKey, `Extrahera receptet från denna bildtext/caption:\n\n${caption}`)
-      if (retryRes.ok) {
-        const retryData  = await retryRes.json()
-        const retryText  = retryData.content?.[0]?.text ?? ''
-        try {
-          const retryParsed = JSON.parse(retryText)
-          if (!retryParsed.error) parsed = retryParsed
-          else console.log('[parse-recipe-url] caption retry also failed:', retryParsed.error)
-        } catch {
-          console.error('[parse-recipe-url] caption retry JSON parse failed:', retryText.slice(0, 200))
-        }
-      }
-    } catch (err) {
-      console.error('[parse-recipe-url] caption retry network error:', err.message)
+  // ── 4. Retry with caption only if first attempt failed and we haven't used caption yet ──
+  if (parsed.error && caption && !jsonLd) {
+    log(reqId, `first attempt failed: "${parsed.error}" — retrying with caption only`)
+    const retry = await askClaude(apiKey, `Extrahera receptet från denna bildtext:\n\n${caption}`, reqId, 'caption-retry')
+    if (!retry.error && !retry.parsed.error) {
+      parsed = retry.parsed
+      log(reqId, 'caption retry succeeded')
+    } else {
+      log(reqId, `caption retry also failed: ${retry.error ?? retry.parsed.error}`)
     }
   }
 
   if (parsed.error) {
-    console.log('[parse-recipe-url] Claude returned error:', parsed.error)
-    console.log('[parse-recipe-url] Claude raw response was:', rawText.slice(0, 500))
+    log(reqId, `FAIL final: ${parsed.error}`)
+    // Give a specific user-facing message for Instagram
+    const userMsg = isInstagram && parsed.error
+      ? `Hittade inget recept i inlägget — ${parsed.error}`
+      : parsed.error
+    return {
+      statusCode: 200,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: userMsg }),
+    }
   }
 
+  log(reqId, `SUCCESS title="${parsed.title}"`)
   return {
     statusCode: 200,
     headers: { ...CORS, 'Content-Type': 'application/json' },
