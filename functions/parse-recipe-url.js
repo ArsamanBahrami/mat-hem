@@ -20,12 +20,39 @@ function log(tag, msg, extra) {
   else console.log(line)
 }
 
-function instagramHeaders() {
-  return {
+function instagramHeaders(withReferer = true) {
+  const h = {
     'User-Agent':      'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
     'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.8',
-    'Referer':         'https://www.instagram.com/',
+  }
+  if (withReferer) h['Referer'] = 'https://www.instagram.com/'
+  return h
+}
+
+function isInstagramCdnUrl(url) {
+  return url && (
+    url.includes('cdninstagram.com') ||
+    url.includes('fbcdn.net') ||
+    url.includes('instagram.com')
+  )
+}
+
+async function fetchImageAsBase64(imageUrl, reqId) {
+  try {
+    const res = await fetch(imageUrl, {
+      headers: { ...instagramHeaders(false), 'Accept': 'image/*,*/*' },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) { log(reqId, `image proxy: HTTP ${res.status}`); return null }
+    const mimeType = (res.headers.get('content-type') ?? 'image/jpeg').split(';')[0].trim()
+    const buffer   = Buffer.from(await res.arrayBuffer())
+    const base64   = buffer.toString('base64')
+    log(reqId, `image proxy: ${buffer.byteLength} bytes, type: ${mimeType}`)
+    return { base64, mimeType }
+  } catch (err) {
+    log(reqId, `image proxy error: ${err.message}`)
+    return null
   }
 }
 
@@ -296,9 +323,26 @@ export const handler = async (event) => {
   }
 
   log(reqId, `SUCCESS title="${parsed.title}"`)
+
+  // Proxy Instagram/CDN images server-side to avoid CORS/hotlink blocks
+  let imagePayload = {}
+  if (ogImage) {
+    if (isInstagramCdnUrl(ogImage)) {
+      log(reqId, `proxying Instagram image: ${ogImage}`)
+      const img = await fetchImageAsBase64(ogImage, reqId)
+      if (img) {
+        imagePayload = { image_base64: img.base64, image_mime_type: img.mimeType }
+      } else {
+        log(reqId, 'image proxy failed — omitting image from response')
+      }
+    } else {
+      imagePayload = { image_url: ogImage }
+    }
+  }
+
   return {
     statusCode: 200,
     headers: { ...CORS, 'Content-Type': 'application/json' },
-    body: JSON.stringify(ogImage ? { ...parsed, image_url: ogImage } : parsed),
+    body: JSON.stringify({ ...parsed, ...imagePayload }),
   }
 }

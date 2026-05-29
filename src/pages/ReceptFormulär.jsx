@@ -222,7 +222,12 @@ export default function ReceptFormulär() {
       if (json.suggested_tags?.length) {
         setTags(json.suggested_tags.filter(t => t))
       }
-      if (json.image_url) {
+      if (json.image_base64 && json.image_mime_type) {
+        // Instagram images are proxied as base64 — convert to File so uploadImage handles it
+        const file = base64ToFile(json.image_base64, json.image_mime_type)
+        setImageFile(file)
+        setImagePreview(URL.createObjectURL(file))
+      } else if (json.image_url) {
         setImagePreview(json.image_url)
         setExistingImg(json.image_url)
       }
@@ -244,6 +249,14 @@ export default function ReceptFormulär() {
       reader.onerror = reject
       reader.readAsDataURL(file)
     })
+  }
+
+  function base64ToFile(base64, mimeType) {
+    const bytes = atob(base64)
+    const arr   = new Uint8Array(bytes.length)
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+    const ext = mimeType.split('/')[1]?.split('+')[0] ?? 'jpg'
+    return new File([arr], `import.${ext}`, { type: mimeType })
   }
 
   // ── Submit ────────────────────────────────────────────
