@@ -3,6 +3,7 @@ export const TAG_GROUPS = {
   Svårighetsgrad:['enkel', 'medel', 'avancerad'],
   Budget:        ['budget'],
   Måltid:        ['frukost', 'lunch', 'middag', 'vardag', 'festlig'],
+  Typ:           ['bakning', 'dessert'],
   Tradition:     ['fredagsrätt'],
 }
 
@@ -14,6 +15,7 @@ const GROUP_STYLE = {
   Svårighetsgrad: { base: 'bg-violet-100 text-violet-700 border-violet-200', active: 'bg-violet-600 text-white border-violet-600' },
   Budget:         { base: 'bg-amber-100 text-amber-700 border-amber-200',  active: 'bg-amber-500 text-white border-amber-500' },
   Måltid:         { base: 'bg-forest-100 text-forest-700 border-forest-200', active: 'bg-forest-600 text-white border-forest-600' },
+  Typ:            { base: 'bg-pink-100 text-pink-700 border-pink-200',       active: 'bg-pink-500 text-white border-pink-500' },
   Tradition:      { base: 'bg-orange-100 text-orange-700 border-orange-200', active: 'bg-orange-500 text-white border-orange-500' },
 }
 
