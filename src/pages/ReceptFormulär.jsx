@@ -33,18 +33,29 @@ export default function ReceptFormulär() {
   const [urlImport,    setUrlImport]   = useState(false)
   const [importUrl,    setImportUrl]   = useState('')
   const [fetchingUrl,  setFetchingUrl] = useState(false)
+  const [allCollections,      setAllCollections]      = useState([])
+  const [selectedCollIds,     setSelectedCollIds]     = useState(new Set())
+  const [originalCollIds,     setOriginalCollIds]     = useState(new Set())
   const fileRef   = useRef()
   const aiFileRef = useRef()
 
   useEffect(() => {
-    if (!isEdit) return
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
-      const { data } = await supabase.rpc('fetch_recipe', {
-        p_user_id: session.user.id,
-        p_recipe_id: id,
-      })
+      const userId = session.user.id
+
+      // Always load collections
+      const colRes = await supabase.rpc('fetch_collections', { p_user_id: userId })
+      setAllCollections(colRes.data ?? [])
+
+      if (!isEdit) return
+
+      const [recipeRes, rcRes] = await Promise.all([
+        supabase.rpc('fetch_recipe', { p_user_id: userId, p_recipe_id: id }),
+        supabase.rpc('fetch_recipe_collections', { p_user_id: userId, p_recipe_id: id }),
+      ])
+      const data = recipeRes.data
       if (!data) return
       setTitle(data.title ?? '')
       setDescription(data.description ?? '')
@@ -57,6 +68,10 @@ export default function ReceptFormulär() {
       setTags(data.tags ?? [])
       setExistingImg(data.image_url ?? null)
       if (data.image_url) setImagePreview(data.image_url)
+
+      const ids = new Set((rcRes.data ?? []).map(c => c.id))
+      setSelectedCollIds(ids)
+      setOriginalCollIds(ids)
     }
     load()
   }, [id])
@@ -301,6 +316,19 @@ export default function ReceptFormulär() {
 
       if (error) { setError(error.message); return }
       if (!data)  { setError('Receptet kunde inte sparas — försök igen.'); return }
+
+      // Add/remove collections
+      const recipeId = data.id
+      const toAdd    = [...selectedCollIds].filter(cid => !originalCollIds.has(cid))
+      const toRemove = [...originalCollIds].filter(cid => !selectedCollIds.has(cid))
+      await Promise.all([
+        ...toAdd.map(cid => supabase.rpc('add_recipe_to_collection', {
+          p_user_id: session.user.id, p_collection_id: cid, p_recipe_id: recipeId,
+        })),
+        ...toRemove.map(cid => supabase.rpc('remove_recipe_from_collection', {
+          p_user_id: session.user.id, p_collection_id: cid, p_recipe_id: recipeId,
+        })),
+      ])
 
       window.dispatchEvent(new CustomEvent('recipe-saved'))
       navigate(`/recept/${data.id}`)
@@ -586,6 +614,42 @@ export default function ReceptFormulär() {
             </div>
           ))}
         </div>
+
+        {/* Samlingar */}
+        {allCollections.length > 0 && (
+          <div className="bg-white rounded-2xl p-4 flex flex-col gap-3">
+            <p className="font-semibold text-gray-700">Spara i samling</p>
+            <div className="flex flex-col gap-1">
+              {allCollections.map(col => {
+                const selected = selectedCollIds.has(col.id)
+                return (
+                  <button
+                    key={col.id}
+                    type="button"
+                    onClick={() => setSelectedCollIds(prev => {
+                      const s = new Set(prev)
+                      selected ? s.delete(col.id) : s.add(col.id)
+                      return s
+                    })}
+                    className="flex items-center gap-3 py-2.5 px-3 rounded-xl active:bg-sand-50 transition text-left"
+                  >
+                    <span className="text-xl w-8 text-center flex-shrink-0">{col.emoji || '📁'}</span>
+                    <span className="flex-1 text-sm font-medium text-gray-800">{col.name}</span>
+                    <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition ${
+                      selected ? 'bg-forest-600 border-forest-600' : 'border-gray-300'
+                    }`}>
+                      {selected && (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" className="w-3 h-3">
+                          <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {aiImported && (
           <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
