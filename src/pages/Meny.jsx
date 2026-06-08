@@ -311,11 +311,11 @@ export default function Meny() {
       {/* Delete confirmation */}
       {confirmDelete && (
         <div
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
           onClick={() => setConfirmDelete(false)}
         >
           <div
-            className="w-full max-w-mobile bg-white rounded-t-3xl p-6 flex flex-col gap-4"
+            className="w-full max-w-mobile bg-white rounded-t-3xl p-6 pb-10 safe-bottom flex flex-col gap-4"
             onClick={e => e.stopPropagation()}
           >
             <div>
