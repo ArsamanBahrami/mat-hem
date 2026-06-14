@@ -60,8 +60,8 @@ export const handler = async (event) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2048,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userMessage }],
       }),
@@ -75,10 +75,15 @@ export const handler = async (event) => {
     return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: `Anthropic-fel (${aiResponse.status}): ${errText}` }) }
   }
 
-  const aiData = await aiResponse.json()
-  const rawText = aiData.content?.[0]?.text ?? ''
+  const aiData   = await aiResponse.json()
+  const rawText  = aiData.content?.[0]?.text ?? ''
+  const stopReason = aiData.stop_reason ?? 'unknown'
 
-  console.log('[generate-shopping-list] raw:', rawText)
+  console.log('[generate-shopping-list] stop_reason:', stopReason, '| raw length:', rawText.length)
+  if (stopReason === 'max_tokens') {
+    console.error('[generate-shopping-list] TRUNCATED — response cut off at token limit')
+  }
+  console.log('[generate-shopping-list] raw:', rawText.slice(0, 300))
 
   // Clean markdown fences and extract JSON array
   let cleaned = rawText.replace(/^\uFEFF/, '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
@@ -90,8 +95,11 @@ export const handler = async (event) => {
   try {
     parsed = JSON.parse(cleaned)
   } catch (err) {
-    console.error('[generate-shopping-list] parse error:', err.message, 'raw:', rawText)
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'Kunde inte tolka AI-svaret', raw: rawText }) }
+    console.error('[generate-shopping-list] parse error:', err.message, '| stop_reason:', stopReason, '| cleaned:', cleaned.slice(0, 300))
+    const userMsg = stopReason === 'max_tokens'
+      ? 'AI-svaret blev för långt och trunkerades — försök med färre recept'
+      : 'Kunde inte tolka AI-svaret'
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: userMsg }) }
   }
 
   // Replace placeholder ids with real UUIDs
