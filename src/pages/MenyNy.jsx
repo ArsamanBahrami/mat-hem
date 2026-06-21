@@ -6,6 +6,22 @@ import { tagStyle } from '../lib/tags'
 const ALL_DAYS = ['måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag', 'söndag']
 const DAY_SHORT = { måndag: 'mån', tisdag: 'tis', onsdag: 'ons', torsdag: 'tor', fredag: 'fre', lördag: 'lör', söndag: 'sön' }
 
+const MENU_DRAFT_KEY = 'matvis_draft_menu'
+
+function saveMenuDraft(menu, params) {
+  try { sessionStorage.setItem(MENU_DRAFT_KEY, JSON.stringify({ menu, params, savedAt: Date.now() })) } catch {}
+}
+function loadMenuDraft() {
+  try {
+    const raw = sessionStorage.getItem(MENU_DRAFT_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch { return null }
+}
+function clearMenuDraft() {
+  try { sessionStorage.removeItem(MENU_DRAFT_KEY) } catch {}
+}
+
 function getThisMonday() {
   const today = new Date()
   const day   = today.getDay()
@@ -202,6 +218,20 @@ export default function MenyNy() {
   const [saving, setSaving]           = useState(false)
 
   useEffect(() => {
+    // Restore unsaved generated menu if available
+    const draft = loadMenuDraft()
+    if (draft?.menu) {
+      setGeneratedMenu(draft.menu)
+      setStep('result')
+      if (draft.params) {
+        if (draft.params.days)      setSelectedDays(draft.params.days)
+        if (draft.params.budget)    setBudget(draft.params.budget)
+        if (draft.params.cook)      setCook(draft.params.cook)
+        if (draft.params.avoid)     setAvoid(draft.params.avoid)
+        if (draft.params.nikkiDays) setNikkiDays(draft.params.nikkiDays)
+      }
+    }
+
     async function load() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { navigate('/'); return }
@@ -244,6 +274,7 @@ export default function MenyNy() {
       const json = await res.json()
       if (json.error) { setGenError(json.error); return }
       setGeneratedMenu(json)
+      saveMenuDraft(json, { days: selectedDays, budget, cook, avoid, nikkiDays })
       setStep('result')
     } catch (err) {
       setGenError('Något gick fel — försök igen.')
@@ -261,10 +292,11 @@ export default function MenyNy() {
   }
 
   function applySwap(newRecipeId) {
-    setGeneratedMenu(prev => ({
-      ...prev,
-      [swapDay]: { ...prev[swapDay], recipe_id: newRecipeId },
-    }))
+    setGeneratedMenu(prev => {
+      const updated = { ...prev, [swapDay]: { ...prev[swapDay], recipe_id: newRecipeId } }
+      saveMenuDraft(updated, { days: selectedDays, budget, cook, avoid, nikkiDays })
+      return updated
+    })
     setSwapDay(null)
   }
 
@@ -279,6 +311,7 @@ export default function MenyNy() {
         p_parameters:      { days: selectedDays, budget, cook, avoid, nikkiDays },
       })
       if (error) { setGenError(error.message); return }
+      clearMenuDraft()
       navigate('/meny')
     } catch (err) {
       setGenError(err.message)
@@ -293,7 +326,7 @@ export default function MenyNy() {
     return (
       <div className="flex flex-col bg-sand-50 min-h-full pb-8">
         <div className="bg-forest-600 text-white px-5 pt-12 pb-5 flex items-center gap-3">
-          <button onClick={() => setStep(3)} className="p-1 -ml-1">
+          <button onClick={() => { clearMenuDraft(); setStep(3) }} className="p-1 -ml-1">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
               <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
             </svg>
